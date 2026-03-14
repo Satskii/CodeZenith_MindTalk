@@ -1,0 +1,20 @@
+{
+  "name": "codezenith_mindtalk",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Satskii/CodeZenith_MindTalk.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Satskii/CodeZenith_MindTalk/issues"
+  },
+  "homepage": "https://github.com/Satskii/CodeZenith_MindTalk#readme"
+}
