@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react'
 import { useTheme } from '../../context/ThemeContext'
+import { useChat } from '../../context/ChatContext'
 import '../../styles/settings.css'
 
 export default function SettingsModal({ open, onClose }) {
   const { theme, toggleTheme } = useTheme()
+  const { language, setLanguage } = useChat()
 
   // Close on Escape
   useEffect(() => {
@@ -50,6 +52,32 @@ export default function SettingsModal({ open, onClose }) {
                 >
                   ☀️ Light
                 </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Language */}
+          <section className="settings-section">
+            <h3 className="settings-section-title">Language</h3>
+            <div className="settings-row settings-row--column">
+              <div className="settings-row-info">
+                <span className="settings-row-label">Response Language</span>
+                <span className="settings-row-desc">MindTalk will reply in your chosen language</span>
+              </div>
+              <div className="lang-toggle-group">
+                {[
+                  { value: 'english', label: 'English' },
+                  { value: 'hindi',   label: 'हिंदी' },
+                  { value: 'bengali', label: 'বাংলা' },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    className={`theme-opt${language === value ? ' active' : ''}`}
+                    onClick={() => setLanguage(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
           </section>

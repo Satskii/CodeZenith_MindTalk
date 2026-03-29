@@ -131,6 +131,29 @@
   flex-shrink: 0;
 }
 
+/* Language toggle group — full width, 3 equal buttons */
+.lang-toggle-group {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  width: 100%;
+}
+
+.lang-toggle-group .theme-opt {
+  flex: 1;
+  text-align: center;
+}
+
+/* Column variant for rows that need to stack */
+.settings-row--column {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 .theme-opt {
   padding: 6px 12px;
   border-radius: var(--radius-sm);

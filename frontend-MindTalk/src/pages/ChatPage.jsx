@@ -8,24 +8,7 @@ import '../styles/chat.css'
 
 export default function ChatPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [muted, setMuted] = useState(false)
-  const [isTyping, setIsTyping] = useState(false)
-  const { addMessage } = useChat()
-
-  const handleSend = (text) => {
-    // Add user message
-    addMessage({ role: 'user', text })
-
-    // Simulate bot response (replace with real backend call)
-    setIsTyping(true)
-    setTimeout(() => {
-      setIsTyping(false)
-      addMessage({
-        role: 'assistant',
-        text: "Thank you for sharing that with me. I'm here to listen and support you. Can you tell me more about how you've been feeling lately?",
-      })
-    }, 1800)
-  }
+  const { sendMessage, isLoading, muted, setMuted } = useChat()
 
   return (
     <div className="chat-layout">
@@ -38,9 +21,9 @@ export default function ChatPage() {
           onToggleMute={() => setMuted(m => !m)}
         />
 
-        <MessageList isTyping={isTyping} />
+        <MessageList isTyping={isLoading} />
 
-        <ChatInput onSend={handleSend} isTyping={isTyping} />
+        <ChatInput onSend={sendMessage} isTyping={isLoading} />
       </div>
     </div>
   )

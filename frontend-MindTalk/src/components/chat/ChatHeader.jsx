@@ -1,18 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useChat } from '../../context/ChatContext'
 
 const LANGUAGES = [
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'es', label: 'Español', flag: '🇪🇸' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
-  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { code: 'hi', label: 'हिंदी', flag: '🇮🇳' },
-  { code: 'zh', label: '中文', flag: '🇨🇳' },
+  { code: 'english', label: 'English', flag: '🇬🇧' },
+  { code: 'hindi',   label: 'हिंदी',   flag: '🇮🇳' },
+  { code: 'bengali', label: 'বাংলা',   flag: '🇧🇩' },
 ]
 
 export default function ChatHeader({ onToggleSidebar, muted, onToggleMute }) {
-  const [lang, setLang] = useState(LANGUAGES[0])
+  const { language, setLanguage } = useChat()
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef(null)
+
+  const activeLang = LANGUAGES.find(l => l.code === language) || LANGUAGES[0]
 
   useEffect(() => {
     const handler = (e) => {
@@ -37,8 +37,8 @@ export default function ChatHeader({ onToggleSidebar, muted, onToggleMute }) {
 
         {/* Language selector */}
         <div className="language-selector" ref={dropdownRef} onClick={() => setOpen(o => !o)}>
-          <span style={{ fontSize: '1.1rem' }}>{lang.flag}</span>
-          <span>{lang.label}</span>
+          <span style={{ fontSize: '1.1rem' }}>{activeLang.flag}</span>
+          <span>{activeLang.label}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 2 }}>
             <polyline points="6 9 12 15 18 9" />
           </svg>
@@ -48,8 +48,8 @@ export default function ChatHeader({ onToggleSidebar, muted, onToggleMute }) {
               {LANGUAGES.map(l => (
                 <div
                   key={l.code}
-                  className={`lang-option${lang.code === l.code ? ' selected' : ''}`}
-                  onClick={(e) => { e.stopPropagation(); setLang(l); setOpen(false) }}
+                  className={`lang-option${activeLang.code === l.code ? ' selected' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); setLanguage(l.code); setOpen(false) }}
                 >
                   <span style={{ fontSize: '1rem' }}>{l.flag}</span>
                   {l.label}
@@ -69,11 +69,6 @@ export default function ChatHeader({ onToggleSidebar, muted, onToggleMute }) {
           title={muted ? 'Unmute responses' : 'Mute responses'}
         >
           {muted ? '🔇' : '🔊'}
-        </button>
-
-        {/* Mic */}
-        <button className="header-icon-btn" aria-label="Voice input">
-          🎙️
         </button>
 
         {/* Avatar */}

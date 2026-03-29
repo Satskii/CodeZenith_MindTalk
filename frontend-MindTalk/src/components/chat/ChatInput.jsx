@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useChat } from '../../context/ChatContext'
+import { useVoice } from '../../hooks/useVoice'
 
 const SendIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -21,8 +22,17 @@ const WAVE_BARS = 12
 
 export default function ChatInput({ onSend, isTyping }) {
   const [text, setText] = useState('')
-  const [recording, setRecording] = useState(false)
   const textareaRef = useRef(null)
+  const { language } = useChat()
+
+  const { recording, transcribing, toggleRecording } = useVoice({
+    language,
+    onTranscript: (transcript) => {
+      setText(transcript)
+      // Auto-focus textarea so user can review/edit before sending
+      setTimeout(() => textareaRef.current?.focus(), 50)
+    },
+  })
 
   // Auto-resize textarea
   useEffect(() => {
@@ -47,15 +57,12 @@ export default function ChatInput({ onSend, isTyping }) {
     }
   }
 
-  const toggleRecording = () => {
-    setRecording(r => !r)
-    // Voice recording logic will be wired to backend
-  }
+  const isBusy = recording || transcribing
 
   return (
     <div className="input-area">
       <div className="input-wrapper">
-        {recording ? (
+        {isBusy ? (
           <div className="voice-wave-container">
             {Array.from({ length: WAVE_BARS }).map((_, i) => (
               <div
@@ -69,7 +76,7 @@ export default function ChatInput({ onSend, isTyping }) {
               />
             ))}
             <span style={{ fontSize: '0.75rem', color: 'var(--accent-blue-bright)', marginLeft: 8, fontWeight: 500 }}>
-              Listening...
+              {transcribing ? 'Transcribing...' : 'Listening...'}
             </span>
           </div>
         ) : (
@@ -86,21 +93,20 @@ export default function ChatInput({ onSend, isTyping }) {
         )}
 
         <div className="input-actions">
-          {/* Mic / Stop recording button */}
           <button
             className={`input-action-btn${recording ? ' recording' : ''}`}
             onClick={toggleRecording}
+            disabled={transcribing || isTyping}
             aria-label={recording ? 'Stop recording' : 'Start voice input'}
             style={{ color: recording ? '#ef4444' : undefined }}
           >
             <MicIcon active={recording} />
           </button>
 
-          {/* Send button */}
           <button
             className="send-btn"
             onClick={handleSend}
-            disabled={!text.trim() || isTyping}
+            disabled={!text.trim() || isTyping || isBusy}
             aria-label="Send message"
           >
             <SendIcon />
