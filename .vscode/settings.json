@@ -6,5 +6,6 @@
     "mindtalk",
     "openai",
     "uvicorn"
-  ]
+  ],
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }
