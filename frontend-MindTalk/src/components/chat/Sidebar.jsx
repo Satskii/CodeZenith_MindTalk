@@ -61,14 +61,16 @@ export default function Sidebar({ collapsed }) {
         <p className="conversations-label">Recent Conversations</p>
         {conversations.map(conv => (
           <div
-            key={conv.id}
-            className={`conversation-item${activeChatId === conv.id ? ' active' : ''}`}
-            onClick={() => selectConversation(conv.id)}
+            key={conv.conv_id}
+            className={`conversation-item${activeChatId === conv.conv_id ? ' active' : ''}`}
+            onClick={() => selectConversation(conv.conv_id)}
           >
             <span className="conversation-icon"><ChatIcon /></span>
             <div className="conversation-info">
               <div className="conversation-title">{conv.title}</div>
-              <div className="conversation-time">{conv.time}</div>
+              <div className="conversation-time">
+                {conv.updated_at ? new Date(conv.updated_at).toLocaleDateString() : ''}
+              </div>
             </div>
           </div>
         ))}

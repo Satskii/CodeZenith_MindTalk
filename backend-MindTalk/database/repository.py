@@ -1,0 +1,414 @@
+"""
+All DB read/write operations.
+Falls back to in-memory store if DB is unavailable.
+"""
+import uuid
+from database.connection import get_connection, release_connection
+
+HISTORY_LIMIT = 20
+
+# In-memory fallback
+_fallback: dict = {}
+_db_available = True
+
+
+def _use_fallback() -> bool:
+    return not _db_available
+
+
+def set_db_available(state: bool):
+    global _db_available
+    _db_available = state
+
+
+# ── Users ─────────────────────────────────────────────────────────────────────
+
+def create_user(name: str, email: str, password_hash: str) -> dict:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO users (name, email, password_hash)
+                   VALUES (%s, %s, %s)
+                   RETURNING id, name, email, created_at""",
+                (name, email, password_hash)
+            )
+            row = cur.fetchone()
+        conn.commit()
+    finally:
+        release_connection(conn)
+    return {"id": str(row[0]), "name": row[1], "email": row[2], "created_at": str(row[3])}
+
+
+def get_user_by_email(email: str) -> dict | None:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, name, email, password_hash FROM users WHERE email = %s",
+                (email,)
+            )
+            row = cur.fetchone()
+    finally:
+        release_connection(conn)
+    if not row:
+        return None
+    return {"id": str(row[0]), "name": row[1], "email": row[2], "password_hash": row[3]}
+
+
+def get_user_by_id(user_id: str) -> dict | None:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, name, email FROM users WHERE id = %s",
+                (user_id,)
+            )
+            row = cur.fetchone()
+    finally:
+        release_connection(conn)
+    if not row:
+        return None
+    return {"id": str(row[0]), "name": row[1], "email": row[2]}
+
+
+# ── Auth Sessions ─────────────────────────────────────────────────────────────
+
+def create_auth_session(user_id: str, token: str, language: str = "english",
+                        ip_address: str = None, device_info: str = None) -> str:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO sessions (user_id, session_token, language, ip_address, device_info)
+                   VALUES (%s, %s, %s, %s, %s)
+                   RETURNING session_id""",
+                (user_id, token, language, ip_address, device_info)
+            )
+            sid = str(cur.fetchone()[0])
+        conn.commit()
+    finally:
+        release_connection(conn)
+    return sid
+
+
+def get_auth_session_by_token(token: str) -> dict | None:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT session_id, user_id, language, expires_at
+                   FROM sessions
+                   WHERE session_token = %s AND expires_at > NOW()""",
+                (token,)
+            )
+            row = cur.fetchone()
+    finally:
+        release_connection(conn)
+    if not row:
+        return None
+    return {
+        "session_id": str(row[0]),
+        "user_id": str(row[1]),
+        "language": row[2],
+        "expires_at": str(row[3]),
+    }
+
+
+def delete_auth_session(token: str):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM sessions WHERE session_token = %s", (token,))
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+def update_session_language(session_id: str, language: str):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE sessions SET language = %s WHERE session_id = %s",
+                (language, session_id)
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+# ── Conversations ─────────────────────────────────────────────────────────────
+
+def create_conversation(user_id: str, session_id: str, title: str = "New Conversation") -> str:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO conversations (user_id, session_id, title)
+                   VALUES (%s, %s, %s) RETURNING conv_id""",
+                (user_id, session_id, title)
+            )
+            conv_id = str(cur.fetchone()[0])
+        conn.commit()
+    finally:
+        release_connection(conn)
+    return conv_id
+
+
+def get_conversation(conv_id: str) -> dict | None:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT conv_id, user_id, title, msg_count, memory FROM conversations WHERE conv_id = %s",
+                (conv_id,)
+            )
+            row = cur.fetchone()
+    finally:
+        release_connection(conn)
+    if not row:
+        return None
+    return {
+        "conv_id": str(row[0]), "user_id": str(row[1]),
+        "title": row[2], "count": row[3], "memory": row[4],
+    }
+
+
+def get_user_conversations(user_id: str) -> list[dict]:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT conv_id, title, msg_count, created_at, updated_at
+                   FROM conversations WHERE user_id = %s
+                   ORDER BY updated_at DESC""",
+                (user_id,)
+            )
+            rows = cur.fetchall()
+    finally:
+        release_connection(conn)
+    return [
+        {"conv_id": str(r[0]), "title": r[1], "msg_count": r[2],
+         "created_at": str(r[3]), "updated_at": str(r[4])}
+        for r in rows
+    ]
+
+
+def update_conversation(conv_id: str, memory: str, msg_count: int, title: str = None):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if title:
+                cur.execute(
+                    "UPDATE conversations SET memory=%s, msg_count=%s, title=%s WHERE conv_id=%s",
+                    (memory, msg_count, title, conv_id)
+                )
+            else:
+                cur.execute(
+                    "UPDATE conversations SET memory=%s, msg_count=%s WHERE conv_id=%s",
+                    (memory, msg_count, conv_id)
+                )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+def delete_conversation(conv_id: str):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM conversations WHERE conv_id = %s", (conv_id,))
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+# ── Messages ──────────────────────────────────────────────────────────────────
+
+def save_message(conv_id: str, role: str, content: str, tokens_used: int = None):
+    if _use_fallback():
+        if conv_id in _fallback:
+            _fallback[conv_id]["history"].append({"role": role, "content": content})
+        return
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO messages (conversation_id, role, content, tokens_used) VALUES (%s, %s, %s, %s)",
+                (conv_id, role, content, tokens_used)
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+def get_recent_history(conv_id: str) -> list[dict]:
+    if _use_fallback():
+        return _fallback.get(conv_id, {}).get("history", [])[-HISTORY_LIMIT:]
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT role, content FROM messages
+                   WHERE conversation_id = %s
+                   ORDER BY created_at DESC LIMIT %s""",
+                (conv_id, HISTORY_LIMIT)
+            )
+            rows = cur.fetchall()
+    finally:
+        release_connection(conn)
+    return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
+
+
+# ── Conversation Summaries ────────────────────────────────────────────────────
+
+def save_summary(conv_id: str, summary: str):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO conversation_summaries (conversation_id, summary) VALUES (%s, %s)",
+                (conv_id, summary)
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+def get_user_context_summary(user_id: str, exclude_conv_id: str = None) -> str:
+    """
+    Returns a combined summary from the user's last 3 conversations
+    (excluding the current one) to give the LLM cross-session context.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT cs.summary
+                   FROM conversation_summaries cs
+                   JOIN conversations c ON cs.conversation_id = c.conv_id
+                   WHERE c.user_id = %s
+                     AND (%s IS NULL OR c.conv_id != %s)
+                   ORDER BY cs.generated_at DESC
+                   LIMIT 3""",
+                (user_id, exclude_conv_id, exclude_conv_id)
+            )
+            rows = cur.fetchall()
+    finally:
+        release_connection(conn)
+    if not rows:
+        return ""
+    return " | ".join(r[0] for r in rows if r[0])
+
+
+# ── Password Reset Tokens ─────────────────────────────────────────────────────
+
+def create_reset_token(user_id: str, token: str):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Invalidate any existing unused tokens for this user
+            cur.execute(
+                "UPDATE password_reset_tokens SET used=TRUE WHERE user_id=%s AND used=FALSE",
+                (user_id,)
+            )
+            cur.execute(
+                "INSERT INTO password_reset_tokens (user_id, token) VALUES (%s, %s)",
+                (user_id, token)
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+def get_valid_reset_token(token: str) -> dict | None:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT user_id FROM password_reset_tokens
+                   WHERE token = %s AND used = FALSE AND expires_at > NOW()""",
+                (token,)
+            )
+            row = cur.fetchone()
+    finally:
+        release_connection(conn)
+    if not row:
+        return None
+    return {"user_id": str(row[0])}
+
+
+def consume_reset_token(token: str):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE password_reset_tokens SET used=TRUE WHERE token=%s",
+                (token,)
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+def update_user_password(user_id: str, password_hash: str):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET password_hash=%s WHERE id=%s",
+                (password_hash, user_id)
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+# ── Mood Logs ─────────────────────────────────────────────────────────────────
+
+def log_mood(user_id: str, mood_score: int, mood_label: str = None, note: str = None):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO mood_logs (user_id, mood_score, mood_label, note) VALUES (%s, %s, %s, %s)",
+                (user_id, mood_score, mood_label, note)
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
+def get_mood_logs(user_id: str) -> list[dict]:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT id, mood_score, mood_label, note, logged_at
+                   FROM mood_logs WHERE user_id = %s ORDER BY logged_at DESC""",
+                (user_id,)
+            )
+            rows = cur.fetchall()
+    finally:
+        release_connection(conn)
+    return [
+        {"id": str(r[0]), "mood_score": r[1], "mood_label": r[2],
+         "note": r[3], "logged_at": str(r[4])}
+        for r in rows
+    ]
+
+
+# ── Fallback helpers (used when DB is down) ───────────────────────────────────
+
+def create_session_fallback(language: str = "english") -> str:
+    sid = str(uuid.uuid4())
+    _fallback[sid] = {"session_id": sid, "language": language, "memory": "", "count": 0, "history": []}
+    return sid
+
+
+def get_session_fallback(sid: str) -> dict | None:
+    sess = _fallback.get(sid)
+    if not sess:
+        return None
+    return {k: v for k, v in sess.items() if k != "history"}

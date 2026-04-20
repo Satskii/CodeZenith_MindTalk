@@ -422,3 +422,34 @@
     border-radius: 20px;
   }
 }
+
+/* Server error banner */
+.auth-server-error {
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.825rem;
+  color: #e74c3c;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Success message */
+.auth-success-msg {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.825rem;
+  color: #16a34a;
+  font-weight: 500;
+  text-align: center;
+}
+
+[data-theme='dark'] .auth-success-msg,
+.dark .auth-success-msg {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.08);
+  border-color: rgba(74, 222, 128, 0.2);
+}

@@ -1,13 +1,16 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { useTheme } from '../../context/ThemeContext'
 import { useChat } from '../../context/ChatContext'
+import { useAuth } from '../../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import '../../styles/settings.css'
 
 export default function SettingsModal({ open, onClose }) {
   const { theme, toggleTheme } = useTheme()
-  const { language, setLanguage } = useChat()
+  const { language, setLanguage, muted, setMuted } = useChat()
+  const { user, signout } = useAuth()
+  const navigate = useNavigate()
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -16,6 +19,12 @@ export default function SettingsModal({ open, onClose }) {
   }, [open, onClose])
 
   if (!open) return null
+
+  const handleSignout = async () => {
+    await signout()
+    onClose()
+    navigate('/auth')
+  }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -30,26 +39,35 @@ export default function SettingsModal({ open, onClose }) {
         </div>
 
         <div className="modal-body">
+          {/* Account */}
+          {user && (
+            <section className="settings-section">
+              <h3 className="settings-section-title">Account</h3>
+              <div className="settings-row">
+                <div className="settings-row-info">
+                  <span className="settings-row-label">{user.name}</span>
+                  <span className="settings-row-desc">{user.email}</span>
+                </div>
+                <button className="settings-signout-btn" onClick={handleSignout}>
+                  Sign Out
+                </button>
+              </div>
+            </section>
+          )}
+
           {/* Appearance */}
           <section className="settings-section">
             <h3 className="settings-section-title">Appearance</h3>
-
             <div className="settings-row">
               <div className="settings-row-info">
                 <span className="settings-row-label">Theme</span>
                 <span className="settings-row-desc">Choose between dark and light mode</span>
               </div>
               <div className="theme-toggle-group">
-                <button
-                  className={`theme-opt${theme === 'dark' ? ' active' : ''}`}
-                  onClick={() => theme !== 'dark' && toggleTheme()}
-                >
+                <button className={`theme-opt${theme === 'dark' ? ' active' : ''}`} onClick={() => theme !== 'dark' && toggleTheme()}>
                   🌙 Dark
                 </button>
-                <button
-                  className={`theme-opt${theme === 'light' ? ' active' : ''}`}
-                  onClick={() => theme !== 'light' && toggleTheme()}
-                >
+                <button className={`theme-opt${theme === 'light' ? ' active' : ''}`} onClick={() => theme !== 'light' && toggleTheme()}>
                   ☀️ Light
                 </button>
               </div>
@@ -85,52 +103,13 @@ export default function SettingsModal({ open, onClose }) {
           {/* Voice */}
           <section className="settings-section">
             <h3 className="settings-section-title">Voice & Audio</h3>
-
             <div className="settings-row">
               <div className="settings-row-info">
                 <span className="settings-row-label">Voice Responses</span>
                 <span className="settings-row-desc">Have MindTalk speak its replies aloud</span>
               </div>
               <label className="toggle-switch">
-                <input type="checkbox" defaultChecked />
-                <span className="toggle-slider" />
-              </label>
-            </div>
-
-            <div className="settings-row">
-              <div className="settings-row-info">
-                <span className="settings-row-label">Microphone Input</span>
-                <span className="settings-row-desc">Allow voice messages</span>
-              </div>
-              <label className="toggle-switch">
-                <input type="checkbox" defaultChecked />
-                <span className="toggle-slider" />
-              </label>
-            </div>
-          </section>
-
-          {/* Privacy */}
-          <section className="settings-section">
-            <h3 className="settings-section-title">Privacy</h3>
-
-            <div className="settings-row">
-              <div className="settings-row-info">
-                <span className="settings-row-label">Save Conversation History</span>
-                <span className="settings-row-desc">Store chats locally for future access</span>
-              </div>
-              <label className="toggle-switch">
-                <input type="checkbox" defaultChecked />
-                <span className="toggle-slider" />
-              </label>
-            </div>
-
-            <div className="settings-row">
-              <div className="settings-row-info">
-                <span className="settings-row-label">Anonymous Mode</span>
-                <span className="settings-row-desc">Don't store any session data</span>
-              </div>
-              <label className="toggle-switch">
-                <input type="checkbox" />
+                <input type="checkbox" checked={!muted} onChange={() => setMuted(m => !m)} />
                 <span className="toggle-slider" />
               </label>
             </div>
@@ -141,7 +120,7 @@ export default function SettingsModal({ open, onClose }) {
             <h3 className="settings-section-title">About</h3>
             <div className="settings-about">
               <p className="settings-about-name">MindTalk</p>
-              <p className="settings-about-version">Version 1.0.0 — Frontend Preview</p>
+              <p className="settings-about-version">Version 1.0.0</p>
               <p className="settings-about-desc">
                 A confidential mental health support platform for students.
                 Available 24/7, wherever you are.

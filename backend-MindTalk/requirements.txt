@@ -1,5 +1,8 @@
-flask
-flask-cors
+fastapi
+uvicorn[standard]
+python-multipart
 openai>=1.0.0
 python-dotenv
 gtts
+psycopg2-binary
+bcrypt

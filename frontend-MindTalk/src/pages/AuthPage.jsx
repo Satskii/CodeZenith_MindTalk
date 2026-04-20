@@ -1,17 +1,16 @@
-import React, { useState, useContext } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import '../styles/auth.css'
 
 function AuthPage() {
   const navigate = useNavigate()
+  const { signup, signin } = useAuth()
   const [mode, setMode] = useState('signin')
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  })
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' })
   const [errors, setErrors] = useState({})
+  const [serverError, setServerError] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleChange = (e) => {
@@ -22,25 +21,14 @@ function AuthPage() {
 
   const validate = () => {
     const newErrors = {}
-    if (mode === 'signup' && !formData.name.trim()) {
-      newErrors.name = 'Name is required'
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Enter a valid email'
-    }
-    if (!formData.password) {
-      newErrors.password = 'Password is required'
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters'
-    }
+    if (mode === 'signup' && !formData.name.trim()) newErrors.name = 'Name is required'
+    if (!formData.email.trim()) newErrors.email = 'Email is required'
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Enter a valid email'
+    if (!formData.password) newErrors.password = 'Password is required'
+    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters'
     if (mode === 'signup') {
-      if (!formData.confirmPassword) {
-        newErrors.confirmPassword = 'Please confirm your password'
-      } else if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match'
-      }
+      if (!formData.confirmPassword) newErrors.confirmPassword = 'Please confirm your password'
+      else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match'
     }
     return newErrors
   }
@@ -48,66 +36,53 @@ function AuthPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     const validationErrors = validate()
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors)
-      return
-    }
+    if (Object.keys(validationErrors).length > 0) { setErrors(validationErrors); return }
     setLoading(true)
-    // Replace with your actual API call
-    setTimeout(() => {
+    setServerError('')
+    try {
+      if (mode === 'signup') {
+        await signup(formData.name, formData.email, formData.password)
+        switchMode('signin')
+        setSuccessMsg('Account created! Please sign in.')
+        setFormData(prev => ({ ...prev, email: formData.email }))
+      } else {
+        await signin(formData.email, formData.password)
+        navigate('/chat')
+      }
+    } catch (err) {
+      setServerError(err.message)
+    } finally {
       setLoading(false)
-      navigate('/')
-    }, 1200)
+    }
   }
 
   const switchMode = (newMode) => {
     setMode(newMode)
     setFormData({ name: '', email: '', password: '', confirmPassword: '' })
     setErrors({})
+    setServerError('')
+    setSuccessMsg('')
   }
 
   return (
     <div className="auth-root">
-      {/* Ambient background blobs */}
       <div className="auth-blob auth-blob-1" />
       <div className="auth-blob auth-blob-2" />
 
       <div className="auth-card">
-        {/* Logo */}
-        <div className="auth-logo" onClick={() => navigate('/')}>
-          MindTalk
-        </div>
+        <div className="auth-logo" onClick={() => navigate('/')}>MindTalk</div>
 
-        {/* Tab switcher */}
         <div className="auth-tabs">
-          <button
-            className={`auth-tab ${mode === 'signin' ? 'active' : ''}`}
-            onClick={() => switchMode('signin')}
-          >
-            Sign In
-          </button>
-          <button
-            className={`auth-tab ${mode === 'signup' ? 'active' : ''}`}
-            onClick={() => switchMode('signup')}
-          >
-            Sign Up
-          </button>
+          <button className={`auth-tab ${mode === 'signin' ? 'active' : ''}`} onClick={() => switchMode('signin')}>Sign In</button>
+          <button className={`auth-tab ${mode === 'signup' ? 'active' : ''}`} onClick={() => switchMode('signup')}>Sign Up</button>
           <div className={`auth-tab-indicator ${mode === 'signup' ? 'right' : 'left'}`} />
         </div>
 
-        {/* Heading */}
         <div className="auth-heading">
-          <h2>
-            {mode === 'signin' ? 'Welcome back' : 'Create your account'}
-          </h2>
-          <p>
-            {mode === 'signin'
-              ? 'Sign in to continue your journey'
-              : 'Start your mental wellness journey today'}
-          </p>
+          <h2>{mode === 'signin' ? 'Welcome back' : 'Create your account'}</h2>
+          <p>{mode === 'signin' ? 'Sign in to continue your journey' : 'Start your mental wellness journey today'}</p>
         </div>
 
-        {/* Form */}
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           {mode === 'signup' && (
             <div className={`auth-field ${errors.name ? 'has-error' : ''}`}>
@@ -115,19 +90,11 @@ function AuthPage() {
               <div className="auth-input-wrap">
                 <span className="auth-input-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                    <circle cx="12" cy="7" r="4"/>
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                   </svg>
                 </span>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  placeholder="Your full name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  autoComplete="name"
-                />
+                <input id="name" name="name" type="text" placeholder="Your full name"
+                  value={formData.name} onChange={handleChange} autoComplete="name" />
               </div>
               {errors.name && <span className="auth-error">{errors.name}</span>}
             </div>
@@ -142,15 +109,8 @@ function AuthPage() {
                   <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
                 </svg>
               </span>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                autoComplete="email"
-              />
+              <input id="email" name="email" type="email" placeholder="you@example.com"
+                value={formData.email} onChange={handleChange} autoComplete="email" />
             </div>
             {errors.email && <span className="auth-error">{errors.email}</span>}
           </div>
@@ -164,15 +124,10 @@ function AuthPage() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </span>
-              <input
-                id="password"
-                name="password"
-                type="password"
+              <input id="password" name="password" type="password"
                 placeholder={mode === 'signup' ? 'Create a password' : 'Enter your password'}
-                value={formData.password}
-                onChange={handleChange}
-                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-              />
+                value={formData.password} onChange={handleChange}
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
             </div>
             {errors.password && <span className="auth-error">{errors.password}</span>}
           </div>
@@ -186,32 +141,27 @@ function AuthPage() {
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                   </svg>
                 </span>
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="Re-enter your password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  autoComplete="new-password"
-                />
+                <input id="confirmPassword" name="confirmPassword" type="password"
+                  placeholder="Re-enter your password" value={formData.confirmPassword}
+                  onChange={handleChange} autoComplete="new-password" />
               </div>
-              {errors.confirmPassword && (
-                <span className="auth-error">{errors.confirmPassword}</span>
-              )}
+              {errors.confirmPassword && <span className="auth-error">{errors.confirmPassword}</span>}
             </div>
           )}
 
           {mode === 'signin' && (
             <div className="auth-forgot">
-              <a href="#">Forgot password?</a>
+              <button className="auth-switch-link" onClick={() => navigate('/forgot-password')}>
+                Forgot password?
+              </button>
             </div>
           )}
 
+          {serverError && <div className="auth-server-error">{serverError}</div>}
+          {successMsg && <div className="auth-success-msg">{successMsg}</div>}
+
           <button type="submit" className="auth-submit-btn" disabled={loading}>
-            {loading ? (
-              <span className="auth-spinner" />
-            ) : (
+            {loading ? <span className="auth-spinner" /> : (
               <>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -224,10 +174,7 @@ function AuthPage() {
 
         <p className="auth-switch-text">
           {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-          <button
-            className="auth-switch-link"
-            onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
-          >
+          <button className="auth-switch-link" onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}>
             {mode === 'signin' ? 'Sign Up' : 'Sign In'}
           </button>
         </p>

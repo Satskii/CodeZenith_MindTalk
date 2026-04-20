@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from '../components/chat/Sidebar'
 import ChatHeader from '../components/chat/ChatHeader'
 import MessageList from '../components/chat/MessageList'
@@ -8,7 +8,11 @@ import '../styles/chat.css'
 
 export default function ChatPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const { sendMessage, isLoading, muted, setMuted } = useChat()
+  const { sendMessage, isLoading, muted, setMuted, loadConversations } = useChat()
+
+  useEffect(() => {
+    loadConversations()
+  }, [])
 
   return (
     <div className="chat-layout">

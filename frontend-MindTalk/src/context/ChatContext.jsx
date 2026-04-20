@@ -1,12 +1,6 @@
-import React, { createContext, useContext, useState, useRef } from 'react'
+import { createContext, useContext, useState, useRef } from 'react'
 
 const ChatContext = createContext()
-
-const SAMPLE_CONVERSATIONS = [
-  { id: 1, title: 'Stress management te...', time: '2h ago', messages: [] },
-  { id: 2, title: 'Dealing with exam anxi...', time: '1d ago', messages: [] },
-  { id: 3, title: 'Sleep improvement str...', time: '3d ago', messages: [] },
-]
 
 const API_BASE_URL = 'http://localhost:5000'
 const FREE_LIMIT = 10
@@ -16,6 +10,7 @@ async function speakText(text, language) {
     const res = await fetch(`${API_BASE_URL}/speak`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ text, language }),
     })
     if (!res.ok) return
@@ -30,43 +25,50 @@ async function speakText(text, language) {
 }
 
 export function ChatProvider({ children }) {
-  const [conversations, setConversations] = useState(SAMPLE_CONVERSATIONS)
-  const [activeChatId, setActiveChatId] = useState(1)
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      role: 'assistant',
-      text: "Hello! I'm here to provide support for your mental health concerns. How are you feeling today?",
-      timestamp: new Date(),
-    }
-  ])
+  const [conversations, setConversations] = useState([])
+  const [activeChatId, setActiveChatId] = useState(null)
+  const [messages, setMessages] = useState([{
+    id: 1,
+    role: 'assistant',
+    text: "Hello! I'm here to provide support for your mental health concerns. How are you feeling today?",
+    timestamp: new Date(),
+  }])
   const [isLoading, setIsLoading] = useState(false)
   const [messagesUsed, setMessagesUsed] = useState(0)
   const [limitReached, setLimitReached] = useState(false)
   const [language, setLanguage] = useState('english')
   const [muted, setMuted] = useState(false)
-  const sessionIdRef = useRef(null)
+  const convIdRef = useRef(null)
 
   const addMessage = (msg) => {
     setMessages(prev => [...prev, { ...msg, id: Date.now(), timestamp: new Date() }])
   }
 
+  const loadConversations = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/conversations`, { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      setConversations(data.conversations || [])
+    } catch (_) {}
+  }
+
   const startNewChat = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/session/reset`, {
+      const res = await fetch(`${API_BASE_URL}/conversations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionIdRef.current, language }),
+        credentials: 'include',
       })
       const data = await res.json()
-      sessionIdRef.current = data.session_id
+      convIdRef.current = data.conv_id
+      setActiveChatId(data.conv_id)
+      setConversations(prev => [
+        { conv_id: data.conv_id, title: data.title, msg_count: 0 },
+        ...prev,
+      ])
     } catch (_) {
-      sessionIdRef.current = null
+      convIdRef.current = null
     }
-
-    const newId = Date.now()
-    setConversations(prev => [{ id: newId, title: 'New conversation', time: 'just now', messages: [] }, ...prev])
-    setActiveChatId(newId)
     setMessages([{
       id: Date.now(),
       role: 'assistant',
@@ -84,17 +86,19 @@ export function ChatProvider({ children }) {
 
     try {
       const body = { message: userMessage, language }
-      if (sessionIdRef.current) body.session_id = sessionIdRef.current
+      if (convIdRef.current) body.conv_id = convIdRef.current
 
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(body),
       })
 
       const data = await response.json()
+      const errorDetail = data.detail || data
 
-      if (response.status === 429 && data.error === 'free_limit_reached') {
+      if (response.status === 429 && errorDetail.error === 'free_limit_reached') {
         setLimitReached(true)
         addMessage({
           role: 'assistant',
@@ -104,17 +108,14 @@ export function ChatProvider({ children }) {
       }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to get response from server')
+        throw new Error(errorDetail.error || errorDetail.detail || 'Failed to get response from server')
       }
 
-      // Persist session ID returned by backend
-      if (data.session_id) sessionIdRef.current = data.session_id
+      if (data.conv_id) convIdRef.current = data.conv_id
       if (data.messages_used !== undefined) setMessagesUsed(data.messages_used)
       if (data.messages_remaining === 0) setLimitReached(true)
 
       addMessage({ role: 'assistant', text: data.response })
-
-      // Auto-play TTS if not muted
       if (!muted) speakText(data.response, language)
     } catch (error) {
       console.error('Error sending message:', error)
@@ -126,6 +127,7 @@ export function ChatProvider({ children }) {
 
   const selectConversation = (id) => {
     setActiveChatId(id)
+    convIdRef.current = id
   }
 
   return (
@@ -141,6 +143,7 @@ export function ChatProvider({ children }) {
       setLanguage,
       muted,
       setMuted,
+      loadConversations,
       startNewChat,
       addMessage,
       sendMessage,

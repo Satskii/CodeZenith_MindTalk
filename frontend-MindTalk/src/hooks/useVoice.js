@@ -36,6 +36,7 @@ export function useVoice({ onTranscript, language = 'english' }) {
 
           const res = await fetch(`${API_BASE_URL}/transcribe`, {
             method: 'POST',
+            credentials: 'include',
             body: formData,
           })
 

@@ -1,9 +1,9 @@
 import json
 from openai import OpenAI
 from ai_module.config import GROQ_API_KEY, AI_MODEL, TEMPERATURE, MAX_TOKENS, BASE_URL
-from ai_module.prompts.language_prompts import PromptManager
+from ai_module.prompts.language_prompts import PromptManagerV2
 
-prompt_manager = PromptManager()
+prompt_manager = PromptManagerV2()
 
 
 def generate_response(
@@ -21,7 +21,7 @@ def generate_response(
         raise ValueError("GROQ_API_KEY is not set. Please add it to your .env file.")
 
     # Crisis detection — short-circuit before hitting the API
-    if prompt_manager.detect_crisis(user_input, language):
+    if prompt_manager.detect_crisis(user_input):
         return prompt_manager.get_crisis_message(language)
 
     client = OpenAI(
@@ -54,12 +54,11 @@ def generate_response(
 
     try:
         parsed = json.loads(raw)
-        return {
-            "actual_response": parsed.get("actual_response", "").strip(),
-            "summarize_context": parsed.get("summarize_context", "").strip(),
-        }
+        actual = parsed.get("actual_response", "").strip()
+        summary = parsed.get("summarize_context", "").strip()
+        if not actual:
+            actual = raw  # fallback to raw if field is empty
+        return {"actual_response": actual, "summarize_context": summary}
     except json.JSONDecodeError:
-        return {
-            "actual_response": raw,
-            "summarize_context": "",
-        }
+        # Model didn't return JSON — use raw text as response
+        return {"actual_response": raw, "summarize_context": ""}
