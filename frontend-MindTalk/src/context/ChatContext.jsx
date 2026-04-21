@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useRef } from 'react'
 
 const ChatContext = createContext()
 
-const API_BASE_URL = 'http://localhost:5000'
+const API_BASE_URL = 'http://localhost:8000'
 const FREE_LIMIT = 10
 
 async function speakText(text, language) {

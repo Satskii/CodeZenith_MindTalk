@@ -302,6 +302,119 @@ def get_user_context_summary(user_id: str, exclude_conv_id: str = None) -> str:
     return " | ".join(r[0] for r in rows if r[0])
 
 
+# ── Detailed Context ──────────────────────────────────────────────────────────
+
+def save_detailed_context(user_id: str, context_data: dict | str, conversation_id: str = None):
+    """
+    Saves detailed user context extracted from a conversation.
+    
+    Args:
+        user_id: User ID
+        context_data: Structured context dict or JSON string
+        conversation_id: Associated conversation ID (optional)
+    """
+    import json
+    
+    if isinstance(context_data, dict):
+        context_json = json.dumps(context_data)
+    else:
+        context_json = context_data
+    
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO user_detailed_contexts (user_id, conversation_id, context_data)
+                   VALUES (%s, %s, %s)
+                   RETURNING context_id""",
+                (user_id, conversation_id, context_json)
+            )
+            context_id = str(cur.fetchone()[0])
+        conn.commit()
+    finally:
+        release_connection(conn)
+    return context_id
+
+
+def get_user_detailed_context(user_id: str, exclude_conv_id: str = None) -> dict:
+    """
+    Retrieves and merges detailed context from the user's last few conversations.
+    This provides rich, specific information for the LLM.
+    
+    Args:
+        user_id: User ID
+        exclude_conv_id: Conversation to exclude (current conversation)
+    
+    Returns:
+        dict: Merged detailed context from previous conversations
+    """
+    import json
+    
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT context_data
+                   FROM user_detailed_contexts
+                   WHERE user_id = %s
+                     AND (%s IS NULL OR conversation_id != %s)
+                   ORDER BY created_at DESC
+                   LIMIT 5""",
+                (user_id, exclude_conv_id, exclude_conv_id)
+            )
+            rows = cur.fetchall()
+    finally:
+        release_connection(conn)
+    
+    if not rows:
+        return {}
+    
+    # Parse and merge contexts (most recent first)
+    merged = {}
+    for row in rows:
+        try:
+            ctx = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+            if not merged:
+                merged = ctx
+            else:
+                # Import here to avoid circular imports
+                from ai_module.context_extractor import merge_contexts
+                merged = merge_contexts(merged, ctx)
+        except:
+            pass
+    
+    return merged
+
+
+def update_detailed_context(user_id: str, context_data: dict | str, conversation_id: str = None) -> str:
+    """
+    Updates the latest detailed context for a user by merging with existing context.
+    """
+    import json
+    
+    # Get existing context
+    existing = get_user_detailed_context(user_id, exclude_conv_id=None)
+    
+    # Parse new context
+    if isinstance(context_data, dict):
+        new_ctx = context_data
+    else:
+        try:
+            new_ctx = json.loads(context_data)
+        except:
+            new_ctx = {}
+    
+    # Merge contexts
+    if existing:
+        from ai_module.context_extractor import merge_contexts
+        merged = merge_contexts(existing, new_ctx)
+    else:
+        merged = new_ctx
+    
+    # Save merged context
+    return save_detailed_context(user_id, merged, conversation_id)
+
+
 # ── Password Reset Tokens ─────────────────────────────────────────────────────
 
 def create_reset_token(user_id: str, token: str):

@@ -1,0 +1,291 @@
+"""
+Detailed Context Extractor - Extracts specific, actionable information from conversations.
+Instead of generic summaries, captures:
+- Key details about user's situation (problems, challenges, achievements)
+- Personal information (background, interests, relationships)
+- Emotional context (how they're feeling, past struggles)
+- Specific goals or concerns mentioned
+- Any advice given and user's response
+"""
+
+import json
+from openai import OpenAI
+from ai_module.config import GROQ_API_KEY, BASE_URL
+
+client = OpenAI(
+    api_key=GROQ_API_KEY,
+    base_url=BASE_URL,
+)
+
+EXTRACTION_PROMPT = """
+You are an expert at extracting important context from conversations.
+Analyze the conversation and extract SPECIFIC, DETAILED information the user shared.
+
+Extract and return ONLY valid JSON with this structure:
+{
+  "personal_info": {
+    "name": "user's name if mentioned",
+    "background": "education level, field of study, current role",
+    "relationships": "family, friends, relationships mentioned",
+    "location": "city/state if mentioned"
+  },
+  "current_situation": {
+    "challenges": ["specific problem 1", "specific problem 2"],
+    "achievements": ["what they succeeded at", "positive things they mentioned"],
+    "responsibilities": "what they're responsible for (work, studies, family)"
+  },
+  "emotional_context": {
+    "primary_feelings": ["stressed", "anxious", "overwhelmed", etc],
+    "past_struggles": ["previous challenges they mentioned"],
+    "coping_mechanisms": ["how they usually handle stress"]
+  },
+  "specific_concerns": [
+    "exact worry 1 as mentioned by user",
+    "exact worry 2 as mentioned by user"
+  ],
+  "goals_and_interests": {
+    "short_term_goals": ["goal 1", "goal 2"],
+    "long_term_goals": ["career goal", "life goal"],
+    "interests": ["hobby 1", "hobby 2"]
+  },
+  "health_indicators": {
+    "sleep_quality": "mentioned sleep status",
+    "stress_level": "1-10 if mentioned",
+    "physical_activity": "mentioned exercise/activity",
+    "substance_use": "any mention of alcohol, drugs, caffeine"
+  },
+  "advice_given_and_response": {
+    "suggestions_made": ["suggestion 1"],
+    "user_response": "did they agree, reject, or modify the advice?"
+  }
+}
+
+RULES:
+- Extract ONLY information explicitly mentioned, don't infer or make assumptions
+- If something wasn't mentioned, set it to null or empty string
+- Be specific: "exam stress in biology" not just "exam stress"
+- Keep exact phrases the user used where possible
+- Return ONLY the JSON, no other text
+"""
+
+def extract_detailed_context(conversation_history: list, language: str = "english") -> dict:
+    """
+    Analyzes a conversation and extracts detailed, structured context.
+    
+    Args:
+        conversation_history: List of message dicts with 'role' and 'content'
+        language: Language of conversation
+    
+    Returns:
+        dict: Structured context with personal info, situation, emotions, etc.
+    """
+    
+    if not conversation_history:
+        return {}
+    
+    # Format conversation for analysis
+    conv_text = "\n".join([
+        f"{msg['role'].upper()}: {msg['content']}"
+        for msg in conversation_history
+    ])
+    
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "system",
+                    "content": EXTRACTION_PROMPT
+                },
+                {
+                    "role": "user",
+                    "content": f"Extract detailed context from this conversation:\n\n{conv_text}"
+                }
+            ],
+            temperature=0.3,  # Low temperature for consistent extraction
+            max_tokens=2000,
+        )
+        
+        response_text = completion.choices[0].message.content.strip()
+        
+        # Clean up any markdown code fences
+        if "```" in response_text:
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+            response_text = response_text.strip()
+        
+        # Parse JSON
+        extracted = json.loads(response_text)
+        return extracted
+        
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] Failed to parse extracted context: {e}")
+        return {}
+    except Exception as e:
+        print(f"[ERROR] Context extraction failed: {e}")
+        return {}
+
+
+def merge_contexts(old_context: dict | str, new_context: dict) -> dict:
+    """
+    Merges old and new context, preserving previous details and adding new ones.
+    
+    Args:
+        old_context: Previous context (dict or JSON string)
+        new_context: Newly extracted context (dict)
+    
+    Returns:
+        dict: Merged context
+    """
+    
+    # Parse old context if it's a string
+    if isinstance(old_context, str):
+        try:
+            old = json.loads(old_context)
+        except:
+            old = {}
+    else:
+        old = old_context or {}
+    
+    # If no old context, return new
+    if not old:
+        return new_context
+    
+    merged = {}
+    
+    # Merge personal_info (new info overrides old)
+    if "personal_info" in old or "personal_info" in new_context:
+        merged["personal_info"] = {**old.get("personal_info", {}), **new_context.get("personal_info", {})}
+    
+    # Merge challenges and achievements (append new, don't duplicate)
+    if "current_situation" in old or "current_situation" in new_context:
+        old_sit = old.get("current_situation", {})
+        new_sit = new_context.get("current_situation", {})
+        merged["current_situation"] = {
+            "challenges": list(set(old_sit.get("challenges", []) + new_sit.get("challenges", []))),
+            "achievements": list(set(old_sit.get("achievements", []) + new_sit.get("achievements", []))),
+            "responsibilities": new_sit.get("responsibilities") or old_sit.get("responsibilities", "")
+        }
+    
+    # Merge emotional context
+    if "emotional_context" in old or "emotional_context" in new_context:
+        old_em = old.get("emotional_context", {})
+        new_em = new_context.get("emotional_context", {})
+        merged["emotional_context"] = {
+            "primary_feelings": list(set(old_em.get("primary_feelings", []) + new_em.get("primary_feelings", []))),
+            "past_struggles": list(set(old_em.get("past_struggles", []) + new_em.get("past_struggles", []))),
+            "coping_mechanisms": list(set(old_em.get("coping_mechanisms", []) + new_em.get("coping_mechanisms", [])))
+        }
+    
+    # Merge specific concerns
+    if "specific_concerns" in old or "specific_concerns" in new_context:
+        merged["specific_concerns"] = list(set(
+            old.get("specific_concerns", []) + new_context.get("specific_concerns", [])
+        ))
+    
+    # Merge goals
+    if "goals_and_interests" in old or "goals_and_interests" in new_context:
+        old_goals = old.get("goals_and_interests", {})
+        new_goals = new_context.get("goals_and_interests", {})
+        merged["goals_and_interests"] = {
+            "short_term_goals": list(set(old_goals.get("short_term_goals", []) + new_goals.get("short_term_goals", []))),
+            "long_term_goals": list(set(old_goals.get("long_term_goals", []) + new_goals.get("long_term_goals", []))),
+            "interests": list(set(old_goals.get("interests", []) + new_goals.get("interests", [])))
+        }
+    
+    # Update health indicators
+    if "health_indicators" in new_context:
+        merged["health_indicators"] = new_context["health_indicators"]
+    elif "health_indicators" in old:
+        merged["health_indicators"] = old["health_indicators"]
+    
+    # Latest advice
+    if "advice_given_and_response" in new_context:
+        merged["advice_given_and_response"] = new_context["advice_given_and_response"]
+    elif "advice_given_and_response" in old:
+        merged["advice_given_and_response"] = old["advice_given_and_response"]
+    
+    return merged
+
+
+def format_context_for_llm(context: dict | str) -> str:
+    """
+    Formats extracted context into a readable prompt for the LLM.
+    
+    Args:
+        context: Structured context dict or JSON string
+    
+    Returns:
+        str: Formatted context prompt
+    """
+    
+    if isinstance(context, str):
+        try:
+            ctx = json.loads(context)
+        except:
+            return ""
+    else:
+        ctx = context
+    
+    if not ctx:
+        return ""
+    
+    lines = []
+    
+    # Personal info
+    if ctx.get("personal_info"):
+        pi = ctx["personal_info"]
+        lines.append("ABOUT THIS USER:")
+        if pi.get("background"):
+            lines.append(f"  - Background: {pi['background']}")
+        if pi.get("relationships"):
+            lines.append(f"  - Relationships: {pi['relationships']}")
+        if pi.get("location"):
+            lines.append(f"  - Location: {pi['location']}")
+    
+    # Current situation
+    if ctx.get("current_situation"):
+        cs = ctx["current_situation"]
+        lines.append("\nCURRENT SITUATION:")
+        if cs.get("challenges"):
+            lines.append(f"  Challenges: {', '.join(cs['challenges'])}")
+        if cs.get("achievements"):
+            lines.append(f"  Recent wins: {', '.join(cs['achievements'])}")
+        if cs.get("responsibilities"):
+            lines.append(f"  Responsibilities: {cs['responsibilities']}")
+    
+    # Emotions
+    if ctx.get("emotional_context"):
+        em = ctx["emotional_context"]
+        lines.append("\nEMOTIONAL CONTEXT:")
+        if em.get("primary_feelings"):
+            lines.append(f"  Currently feeling: {', '.join(em['primary_feelings'])}")
+        if em.get("coping_mechanisms"):
+            lines.append(f"  Usually copes with: {', '.join(em['coping_mechanisms'])}")
+    
+    # Concerns
+    if ctx.get("specific_concerns"):
+        lines.append("\nSPECIFIC CONCERNS:")
+        for concern in ctx["specific_concerns"][:5]:  # Max 5
+            lines.append(f"  - {concern}")
+    
+    # Goals
+    if ctx.get("goals_and_interests"):
+        gi = ctx["goals_and_interests"]
+        lines.append("\nGOALS & INTERESTS:")
+        if gi.get("short_term_goals"):
+            lines.append(f"  Short-term: {', '.join(gi['short_term_goals'])}")
+        if gi.get("long_term_goals"):
+            lines.append(f"  Long-term: {', '.join(gi['long_term_goals'])}")
+    
+    # Health
+    if ctx.get("health_indicators"):
+        hi = ctx["health_indicators"]
+        if any(hi.values()):
+            lines.append("\nHEALTH:")
+            for key, value in hi.items():
+                if value:
+                    lines.append(f"  - {key}: {value}")
+    
+    return "\n".join(lines) if lines else ""

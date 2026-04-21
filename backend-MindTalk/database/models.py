@@ -65,6 +65,18 @@ CREATE TABLE IF NOT EXISTS conversation_summaries (
 );
 """
 
+# ── 5b. Detailed Context Summaries (NEW) ──────────────────────────────────────
+CREATE_DETAILED_CONTEXT_TABLE = """
+CREATE TABLE IF NOT EXISTS user_detailed_contexts (
+    context_id      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    conversation_id UUID        REFERENCES conversations(conv_id) ON DELETE SET NULL,
+    context_data    JSONB       NOT NULL,
+    created_at      TIMESTAMP   NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+"""
+
 # ── 6. Mood Logs (optional) ───────────────────────────────────────────────────
 CREATE_MOOD_LOGS_TABLE = """
 CREATE TABLE IF NOT EXISTS mood_logs (

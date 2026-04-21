@@ -8,6 +8,7 @@ from database.models import (
     CREATE_CONVERSATIONS_TABLE,
     CREATE_MESSAGES_TABLE,
     CREATE_SUMMARIES_TABLE,
+    CREATE_DETAILED_CONTEXT_TABLE,
     CREATE_MOOD_LOGS_TABLE,
     CREATE_PASSWORD_RESET_TABLE,
     CREATE_UPDATED_AT_TRIGGER,
@@ -24,6 +25,7 @@ def init_db():
             cur.execute(CREATE_CONVERSATIONS_TABLE)
             cur.execute(CREATE_MESSAGES_TABLE)
             cur.execute(CREATE_SUMMARIES_TABLE)
+            cur.execute(CREATE_DETAILED_CONTEXT_TABLE)
             cur.execute(CREATE_MOOD_LOGS_TABLE)
             cur.execute(CREATE_PASSWORD_RESET_TABLE)
             cur.execute(CREATE_UPDATED_AT_TRIGGER)

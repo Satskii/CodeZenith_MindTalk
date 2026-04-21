@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import '../styles/auth.css'
 
-const API_BASE_URL = 'http://localhost:5000'
+const API_BASE_URL = 'http://localhost:8000'
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate()

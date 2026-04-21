@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from ai_module.response_generator import generate_response
+from ai_module.context_extractor import extract_detailed_context, format_context_for_llm
 from ai_module.config import FREE_CHAT_LIMIT
 from stt_module.transcriber import transcribe_audio
 from tts_module.synthesizer import synthesize_speech
@@ -259,11 +260,24 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
 
     history = db.get_recent_history(conv_id)
 
-    # For new conversations (no memory yet), inject summaries from prior sessions
-    # so the LLM has cross-session context about this user
+    # Get detailed context from previous conversations
+    # This captures specific information the user shared in past sessions
+    detailed_context = db.get_user_detailed_context(
+        current_user["id"], 
+        exclude_conv_id=conv_id
+    )
+    
+    # Format detailed context for the LLM
+    formatted_detailed_context = format_context_for_llm(detailed_context)
+    
+    # Combine with traditional memory for backward compatibility
     memory = conv["memory"]
-    if not memory:
+    if not memory and not formatted_detailed_context:
         memory = db.get_user_context_summary(current_user["id"], exclude_conv_id=conv_id)
+    
+    # Add formatted detailed context to memory
+    if formatted_detailed_context:
+        memory = formatted_detailed_context + ("\n\n" + memory if memory else "")
 
     try:
         result = generate_response(
@@ -287,6 +301,20 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
     db.update_conversation(conv_id, new_summary, new_count)
     if new_summary:
         db.save_summary(conv_id, new_summary)
+    
+    # Extract and save detailed context from this conversation
+    try:
+        if len(history) >= 2:  # Only extract after a few messages
+            new_detailed_context = extract_detailed_context(history + [{"role": "user", "content": user_input}, {"role": "assistant", "content": bot_reply}], language)
+            if new_detailed_context:
+                db.update_detailed_context(
+                    current_user["id"],
+                    new_detailed_context,
+                    conversation_id=conv_id
+                )
+    except Exception as e:
+        print(f"[WARN] Detailed context extraction failed: {e}")
+        # Don't fail the chat request if context extraction fails
 
     # Sync language on auth session
     if language != current_user.get("language"):
