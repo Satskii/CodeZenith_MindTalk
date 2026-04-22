@@ -15,9 +15,9 @@ const features = [
     desc: 'Get help anytime, day or night, whenever you need it.',
   },
   {
-    icon: '🔗',
-    title: 'Resource Connection',
-    desc: 'Get connected to professional resources when needed.',
+    icon: '🗣️',
+    title: 'Multi-Lingual',
+    desc: 'Communicate in your preferred language.',
   },
 ]
 
@@ -36,7 +36,7 @@ export default function LandingPage() {
 
       {/* Navbar */}
       <nav className="navbar">
-        <span className="navbar-logo">MindTalk</span>
+        <span className="navbar-logo">MindVarta</span>
         <div className="navbar-actions">
           <button
             className="theme-toggle"
@@ -44,7 +44,7 @@ export default function LandingPage() {
             aria-label="Toggle theme"
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {theme === 'dark' ? '🌕' : '🌑'}
           </button>
           <button className="btn-get-started" onClick={() => navigate('/auth')}>
             Get Started
@@ -60,8 +60,8 @@ export default function LandingPage() {
         </div>
 
         <h1 className="hero-title">
-          Student Mental Health Support.
-          <span className="hero-title-accent">Always Available.</span>
+          Your Mind,Your Language,
+          <span className="hero-title-accent">Our Support.</span>
         </h1>
 
         <p className="hero-subtitle">
