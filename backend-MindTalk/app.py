@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
         print("  MISSING ENVIRONMENT VARIABLES:")
         for var in missing:
             print(f"    - {var}")
-        print("\n  Copy backend-MindTalk/.env.example to backend-MindTalk/.env")
+        print("\n  Copy backend-MindVarta/.env.example to backend-MindVarta/.env")
         print("  and fill in your credentials before starting the server.")
         print("="*60 + "\n")
         raise RuntimeError(f"Missing required env vars: {', '.join(missing)}")
@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
     close_pool()
 
 
-app = FastAPI(title="MindTalk API", lifespan=lifespan)
+app = FastAPI(title="MindVarta API", lifespan=lifespan)
 
 # In development allow all localhost origins dynamically
 def is_allowed_origin(origin: str) -> bool:

@@ -80,7 +80,7 @@ export default function SettingsModal({ open, onClose }) {
             <div className="settings-row settings-row--column">
               <div className="settings-row-info">
                 <span className="settings-row-label">Response Language</span>
-                <span className="settings-row-desc">MindTalk will reply in your chosen language</span>
+                <span className="settings-row-desc">MindVarta will reply in your chosen language</span>
               </div>
               <div className="lang-toggle-group">
                 {[
@@ -106,7 +106,7 @@ export default function SettingsModal({ open, onClose }) {
             <div className="settings-row">
               <div className="settings-row-info">
                 <span className="settings-row-label">Voice Responses</span>
-                <span className="settings-row-desc">Have MindTalk speak its replies aloud</span>
+                <span className="settings-row-desc">Have MindVarta speak its replies aloud</span>
               </div>
               <label className="toggle-switch">
                 <input type="checkbox" checked={!muted} onChange={() => setMuted(m => !m)} />
@@ -119,7 +119,7 @@ export default function SettingsModal({ open, onClose }) {
           <section className="settings-section">
             <h3 className="settings-section-title">About</h3>
             <div className="settings-about">
-              <p className="settings-about-name">MindTalk</p>
+              <p className="settings-about-name">MindVarta</p>
               <p className="settings-about-version">Version 1.0.0</p>
               <p className="settings-about-desc">
                 A confidential mental health support platform for students.

@@ -45,7 +45,7 @@ export default function ResetPasswordPage() {
       <div className="auth-blob auth-blob-2" />
 
       <div className="auth-card">
-        <div className="auth-logo" onClick={() => navigate('/')}>MindTalk</div>
+        <div className="auth-logo" onClick={() => navigate('/')}>MindVarta</div>
 
         <div className="auth-heading">
           <h2>Set new password</h2>

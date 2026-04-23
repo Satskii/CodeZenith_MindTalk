@@ -95,10 +95,14 @@
 
 /* ---- Logo ---- */
 .auth-logo {
+  font-family: var(--font-display, 'Inter', sans-serif);
   font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.5px;
-  color: #1a6fd4;
+  background: linear-gradient(90deg, #FF9933 0%, #FFFFFF 50%, #138808 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 1.75rem;
   cursor: pointer;
   display: inline-block;
@@ -108,7 +112,10 @@
 
 [data-theme='dark'] .auth-logo,
 .dark .auth-logo {
-  color: #4da8ff;
+  background: linear-gradient(90deg, #FF9933 0%, #FFFFFF 50%, #138808 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* ---- Tabs ---- */

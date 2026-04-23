@@ -36,7 +36,7 @@ export default function Sidebar({ collapsed }) {
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {/* Header */}
       <div className="sidebar-header">
-        <span className="sidebar-logo">MindTalk</span>
+        <span className="sidebar-logo">MindVarta</span>
         <button
           className="sidebar-theme-btn"
           onClick={toggleTheme}

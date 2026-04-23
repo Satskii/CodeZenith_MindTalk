@@ -70,7 +70,7 @@ function AuthPage() {
       <div className="auth-blob auth-blob-2" />
 
       <div className="auth-card">
-        <div className="auth-logo" onClick={() => navigate('/')}>MindTalk</div>
+        <div className="auth-logo" onClick={() => navigate('/')}>MindVarta</div>
 
         <div className="auth-tabs">
           <button className={`auth-tab ${mode === 'signin' ? 'active' : ''}`} onClick={() => switchMode('signin')}>Sign In</button>
