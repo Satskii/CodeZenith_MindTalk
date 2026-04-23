@@ -106,6 +106,39 @@ class MoodLogRequest(BaseModel):
     note: Optional[str] = None
 
 
+# ── Security Helpers ──────────────────────────────────────────────────────────
+
+def verify_conversation_ownership(conv_id: str, user_id: str) -> dict:
+    """
+    Verifies that a conversation belongs to the current user.
+    Raises 403 if user is not the owner, 404 if conversation doesn't exist.
+    
+    Args:
+        conv_id: Conversation ID to verify
+        user_id: Current user's ID
+    
+    Returns:
+        dict: The conversation object if ownership is verified
+    
+    Raises:
+        HTTPException: 404 if not found, 403 if not owner
+    """
+    if not conv_id:
+        raise HTTPException(status_code=400, detail="Conversation ID is required")
+    
+    conv = db.get_conversation(conv_id)
+    
+    if not conv:
+        print(f"[SECURITY] Attempt to access non-existent conversation {conv_id} by user {user_id}")
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    if str(conv["user_id"]) != str(user_id):
+        print(f"[SECURITY] UNAUTHORIZED ACCESS: User {user_id} tried to access conv {conv_id} (owner: {conv['user_id']})")
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return conv
+
+
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
 @app.post("/auth/signup")
@@ -188,7 +221,12 @@ async def reset_password(body: ResetPasswordRequest):
 async def signout(request: Request, response: Response):
     token = request.cookies.get(COOKIE_NAME)
     if token:
-        db.delete_auth_session(token)
+        session = db.get_auth_session_by_token(token)
+        if session:
+            print(f"[SECURITY] User {session['user_id']} signed out at {token[:20]}...")
+            db.delete_auth_session(token)
+        else:
+            print(f"[SECURITY] Signout attempt with invalid token")
     response.delete_cookie(COOKIE_NAME)
     return {"message": "Signed out"}
 
@@ -216,10 +254,10 @@ async def new_conversation(current_user: dict = Depends(get_current_user)):
 
 @app.delete("/conversations/{conv_id}")
 async def delete_conversation(conv_id: str, current_user: dict = Depends(get_current_user)):
-    conv = db.get_conversation(conv_id)
-    if not conv or conv["user_id"] != current_user["id"]:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    # Verify ownership before deleting
+    verify_conversation_ownership(conv_id, current_user["id"])
     db.delete_conversation(conv_id)
+    print(f"[INFO] User {current_user['id']} deleted conversation {conv_id}")
     return {"message": "Deleted"}
 
 
@@ -238,15 +276,16 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
     # Get or create conversation
     conv_id = body.conv_id
     if conv_id:
-        conv = db.get_conversation(conv_id)
-        if not conv or conv["user_id"] != current_user["id"]:
-            conv_id = None
-
-    if not conv_id:
+        # SECURITY: Verify ownership of existing conversation
+        # This will raise 403 if user doesn't own the conversation
+        conv = verify_conversation_ownership(conv_id, current_user["id"])
+    else:
+        # Create new conversation
         from datetime import datetime
         title = f"Session on {datetime.now().strftime('%b %d')}"
         conv_id = db.create_conversation(current_user["id"], current_user["session_id"], title)
         conv = db.get_conversation(conv_id)
+        print(f"[INFO] User {current_user['id']} created new conversation {conv_id}")
 
     if conv["count"] >= FREE_CHAT_LIMIT:
         raise HTTPException(
@@ -270,14 +309,29 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
     # Format detailed context for the LLM
     formatted_detailed_context = format_context_for_llm(detailed_context)
     
-    # Combine with traditional memory for backward compatibility
+    # Always combine all available context sources for the LLM
     memory = conv["memory"]
-    if not memory and not formatted_detailed_context:
-        memory = db.get_user_context_summary(current_user["id"], exclude_conv_id=conv_id)
     
-    # Add formatted detailed context to memory
+    # Get context summary as additional context source
+    context_summary = db.get_user_context_summary(current_user["id"], exclude_conv_id=conv_id)
+    
+    # Build comprehensive memory: detailed context + summary context + current conversation memory
+    memory_parts = []
     if formatted_detailed_context:
-        memory = formatted_detailed_context + ("\n\n" + memory if memory else "")
+        memory_parts.append(formatted_detailed_context)
+    if context_summary:
+        memory_parts.append(context_summary)
+    if memory:
+        memory_parts.append(memory)
+    
+    # Combine all parts with clear separation
+    memory = "\n\n".join(memory_parts) if memory_parts else ""
+    
+    # Log for debugging context retrieval for all users
+    if not memory:
+        print(f"[INFO] No prior context found for user {current_user['id']} in conv {conv_id}")
+    else:
+        print(f"[INFO] Loaded context for user {current_user['id']}: {len(memory)} chars")
 
     try:
         result = generate_response(
@@ -303,17 +357,22 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
         db.save_summary(conv_id, new_summary)
     
     # Extract and save detailed context from this conversation
+    # Do this for ALL messages, not just after 2+ messages, so context is available from the start
     try:
-        if len(history) >= 2:  # Only extract after a few messages
-            new_detailed_context = extract_detailed_context(history + [{"role": "user", "content": user_input}, {"role": "assistant", "content": bot_reply}], language)
+        full_history = history + [{"role": "user", "content": user_input}, {"role": "assistant", "content": bot_reply}]
+        if len(full_history) > 0:  # Extract from first message onwards
+            new_detailed_context = extract_detailed_context(full_history, language)
             if new_detailed_context:
                 db.update_detailed_context(
                     current_user["id"],
                     new_detailed_context,
                     conversation_id=conv_id
                 )
+                print(f"[INFO] Saved detailed context for user {current_user['id']} from conv {conv_id}")
+            else:
+                print(f"[DEBUG] No detailed context extracted (might be too short): {len(full_history)} messages")
     except Exception as e:
-        print(f"[WARN] Detailed context extraction failed: {e}")
+        print(f"[WARN] Detailed context extraction failed for user {current_user['id']}: {e}")
         # Don't fail the chat request if context extraction fails
 
     # Sync language on auth session
@@ -351,12 +410,37 @@ async def transcribe(
     language: str = Form(default="english"),
     current_user: dict = Depends(get_current_user),
 ):
+    user_id = current_user.get("id", "unknown")
+    lang = language.strip().lower()
+    
     try:
-        transcript = await transcribe_audio(audio, language.strip().lower())
+        # Log incoming request
+        print(f"[STT] /transcribe called by user {user_id}")
+        print(f"[STT] Audio file: {audio.filename}, Content-Type: {audio.content_type}, Language: {lang}")
+        
+        # Get file size
+        audio_content = await audio.read()
+        file_size = len(audio_content)
+        print(f"[STT] Audio size: {file_size} bytes")
+        
+        # Reset file pointer for transcriber
+        await audio.seek(0)
+        
+        # Transcribe
+        transcript = await transcribe_audio(audio, lang)
+        
+        if not transcript or not transcript.strip():
+            print(f"[STT] Empty transcription from audio ({file_size} bytes)")
+            return {"transcript": ""}
+        
+        print(f"[STT] Transcription success ({file_size} bytes -> {len(transcript)} chars): {transcript[:100]}...")
+        return {"transcript": transcript}
+        
     except Exception as e:
-        print(f"[ERROR] transcribe failed: {e}")
-        raise HTTPException(status_code=500, detail="Transcription failed.")
-    return {"transcript": transcript}
+        print(f"[STT] Transcription failed for user {user_id}: {type(e).__name__}: {e}")
+        import traceback
+        print(f"[STT] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
 
 # ── Mood Logs ─────────────────────────────────────────────────────────────────

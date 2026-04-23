@@ -42,10 +42,20 @@ Avoid repetition of phrases like:
 - I understand
 - it is okay
 
-Output strictly in JSON:
+IMPORTANT: You MUST respond ONLY with valid JSON. Nothing else before or after.
+Do NOT include any text outside the JSON structure.
+Do NOT repeat field names in the response text.
+
+Output format - ALWAYS use this exact format:
 {
-  "actual_response": "...",
-  "summarize_context": "..."
+  "actual_response": "Your supportive response here - keep it natural and conversational",
+  "summarize_context": "Brief summary of what user shared/concerns mentioned"
+}
+
+Example:
+{
+  "actual_response": "That sounds really tough. Exams can feel overwhelming, but breaking it down into smaller topics might help. Even just studying for 30 minutes without distractions can make a difference.",
+  "summarize_context": "Student feeling stressed about upcoming exams"
 }
 """
 

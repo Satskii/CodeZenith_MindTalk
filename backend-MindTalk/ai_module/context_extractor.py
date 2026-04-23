@@ -163,8 +163,8 @@ def merge_contexts(old_context: dict | str, new_context: dict) -> dict:
         old_sit = old.get("current_situation", {})
         new_sit = new_context.get("current_situation", {})
         merged["current_situation"] = {
-            "challenges": list(set(old_sit.get("challenges", []) + new_sit.get("challenges", []))),
-            "achievements": list(set(old_sit.get("achievements", []) + new_sit.get("achievements", []))),
+            "challenges": list(set((old_sit.get("challenges") or []) + (new_sit.get("challenges") or []))),
+            "achievements": list(set((old_sit.get("achievements") or []) + (new_sit.get("achievements") or []))),
             "responsibilities": new_sit.get("responsibilities") or old_sit.get("responsibilities", "")
         }
     
@@ -173,15 +173,15 @@ def merge_contexts(old_context: dict | str, new_context: dict) -> dict:
         old_em = old.get("emotional_context", {})
         new_em = new_context.get("emotional_context", {})
         merged["emotional_context"] = {
-            "primary_feelings": list(set(old_em.get("primary_feelings", []) + new_em.get("primary_feelings", []))),
-            "past_struggles": list(set(old_em.get("past_struggles", []) + new_em.get("past_struggles", []))),
-            "coping_mechanisms": list(set(old_em.get("coping_mechanisms", []) + new_em.get("coping_mechanisms", [])))
+            "primary_feelings": list(set((old_em.get("primary_feelings") or []) + (new_em.get("primary_feelings") or []))),
+            "past_struggles": list(set((old_em.get("past_struggles") or []) + (new_em.get("past_struggles") or []))),
+            "coping_mechanisms": list(set((old_em.get("coping_mechanisms") or []) + (new_em.get("coping_mechanisms") or [])))
         }
     
     # Merge specific concerns
     if "specific_concerns" in old or "specific_concerns" in new_context:
         merged["specific_concerns"] = list(set(
-            old.get("specific_concerns", []) + new_context.get("specific_concerns", [])
+            (old.get("specific_concerns") or []) + (new_context.get("specific_concerns") or [])
         ))
     
     # Merge goals
@@ -189,9 +189,9 @@ def merge_contexts(old_context: dict | str, new_context: dict) -> dict:
         old_goals = old.get("goals_and_interests", {})
         new_goals = new_context.get("goals_and_interests", {})
         merged["goals_and_interests"] = {
-            "short_term_goals": list(set(old_goals.get("short_term_goals", []) + new_goals.get("short_term_goals", []))),
-            "long_term_goals": list(set(old_goals.get("long_term_goals", []) + new_goals.get("long_term_goals", []))),
-            "interests": list(set(old_goals.get("interests", []) + new_goals.get("interests", [])))
+            "short_term_goals": list(set((old_goals.get("short_term_goals") or []) + (new_goals.get("short_term_goals") or []))),
+            "long_term_goals": list(set((old_goals.get("long_term_goals") or []) + (new_goals.get("long_term_goals") or []))),
+            "interests": list(set((old_goals.get("interests") or []) + (new_goals.get("interests") or [])))
         }
     
     # Update health indicators

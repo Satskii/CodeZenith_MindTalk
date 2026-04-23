@@ -298,8 +298,12 @@ def get_user_context_summary(user_id: str, exclude_conv_id: str = None) -> str:
     finally:
         release_connection(conn)
     if not rows:
+        print(f"[DEBUG] No context summaries found for user {user_id}")
         return ""
-    return " | ".join(r[0] for r in rows if r[0])
+    
+    result = " | ".join(r[0] for r in rows if r[0])
+    print(f"[DEBUG] Retrieved context summary ({len(result)} chars) for user {user_id}")
+    return result
 
 
 # ── Detailed Context ──────────────────────────────────────────────────────────
@@ -331,6 +335,10 @@ def save_detailed_context(user_id: str, context_data: dict | str, conversation_i
             )
             context_id = str(cur.fetchone()[0])
         conn.commit()
+        print(f"[DEBUG] Saved detailed context {context_id} for user {user_id}")
+    except Exception as e:
+        print(f"[ERROR] Failed to save detailed context for user {user_id}: {e}")
+        raise
     finally:
         release_connection(conn)
     return context_id
@@ -367,7 +375,10 @@ def get_user_detailed_context(user_id: str, exclude_conv_id: str = None) -> dict
         release_connection(conn)
     
     if not rows:
+        print(f"[DEBUG] No detailed context found for user {user_id}")
         return {}
+    
+    print(f"[DEBUG] Retrieved {len(rows)} detailed context records for user {user_id}")
     
     # Parse and merge contexts (most recent first)
     merged = {}
@@ -380,7 +391,8 @@ def get_user_detailed_context(user_id: str, exclude_conv_id: str = None) -> dict
                 # Import here to avoid circular imports
                 from ai_module.context_extractor import merge_contexts
                 merged = merge_contexts(merged, ctx)
-        except:
+        except Exception as e:
+            print(f"[WARN] Failed to parse detailed context: {e}")
             pass
     
     return merged
@@ -389,11 +401,9 @@ def get_user_detailed_context(user_id: str, exclude_conv_id: str = None) -> dict
 def update_detailed_context(user_id: str, context_data: dict | str, conversation_id: str = None) -> str:
     """
     Updates the latest detailed context for a user by merging with existing context.
+    Ensures context is saved for ALL users on every message.
     """
     import json
-    
-    # Get existing context
-    existing = get_user_detailed_context(user_id, exclude_conv_id=None)
     
     # Parse new context
     if isinstance(context_data, dict):
@@ -402,17 +412,39 @@ def update_detailed_context(user_id: str, context_data: dict | str, conversation
         try:
             new_ctx = json.loads(context_data)
         except:
+            print(f"[WARN] Invalid context data for user {user_id}")
             new_ctx = {}
+    
+    if not new_ctx:
+        print(f"[DEBUG] No new context to save for user {user_id}")
+        return None
+    
+    # Get existing context
+    try:
+        existing = get_user_detailed_context(user_id, exclude_conv_id=None)
+    except Exception as e:
+        print(f"[WARN] Could not retrieve existing context for user {user_id}: {e}")
+        existing = {}
     
     # Merge contexts
     if existing:
-        from ai_module.context_extractor import merge_contexts
-        merged = merge_contexts(existing, new_ctx)
+        try:
+            from ai_module.context_extractor import merge_contexts
+            merged = merge_contexts(existing, new_ctx)
+            print(f"[DEBUG] Merged context with existing for user {user_id}")
+        except Exception as e:
+            print(f"[WARN] Context merge failed for user {user_id}: {e}")
+            merged = new_ctx
     else:
         merged = new_ctx
     
     # Save merged context
-    return save_detailed_context(user_id, merged, conversation_id)
+    try:
+        return save_detailed_context(user_id, merged, conversation_id)
+    except Exception as e:
+        print(f"[ERROR] Failed to update detailed context for user {user_id}: {e}")
+        # Don't raise, let chat continue
+        return None
 
 
 # ── Password Reset Tokens ─────────────────────────────────────────────────────
