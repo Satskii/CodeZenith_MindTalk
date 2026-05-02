@@ -8,7 +8,7 @@ import '../styles/chat.css'
 
 export default function ChatPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const { sendMessage, isLoading, muted, setMuted, loadConversations } = useChat()
+  const { sendMessage, isLoading, muted, setMuted, loadConversations, readOnly } = useChat()
 
   useEffect(() => {
     loadConversations()
@@ -27,7 +27,7 @@ export default function ChatPage() {
 
         <MessageList isTyping={isLoading} />
 
-        <ChatInput onSend={sendMessage} isTyping={isLoading} />
+        <ChatInput onSend={sendMessage} isTyping={isLoading} readOnly={readOnly} />
       </div>
     </div>
   )

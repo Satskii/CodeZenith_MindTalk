@@ -12,6 +12,7 @@ from database.models import (
     CREATE_MOOD_LOGS_TABLE,
     CREATE_PASSWORD_RESET_TABLE,
     CREATE_UPDATED_AT_TRIGGER,
+    ADD_LANGUAGE_COLUMN_TO_CONVERSATIONS,
 )
 from database import repository
 
@@ -29,6 +30,7 @@ def init_db():
             cur.execute(CREATE_MOOD_LOGS_TABLE)
             cur.execute(CREATE_PASSWORD_RESET_TABLE)
             cur.execute(CREATE_UPDATED_AT_TRIGGER)
+            cur.execute(ADD_LANGUAGE_COLUMN_TO_CONVERSATIONS)
         conn.commit()
         repository.set_db_available(True)
         print("[DB] All tables ready.")

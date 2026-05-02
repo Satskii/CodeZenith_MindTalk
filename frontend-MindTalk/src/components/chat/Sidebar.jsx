@@ -4,6 +4,22 @@ import { useTheme } from '../../context/ThemeContext'
 import { useChat } from '../../context/ChatContext'
 import SettingsModal from './SettingsModal'
 
+// Helper function to format date properly from ISO string
+const formatDate = (isoString) => {
+  if (!isoString) return ''
+  try {
+    const date = new Date(isoString)
+    // Use UTC getters to ensure we get the correct date regardless of timezone
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth()
+    const day = date.getUTCDate()
+    const localDate = new Date(year, month, day)
+    return localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch {
+    return ''
+  }
+}
+
 const ChatIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -69,7 +85,7 @@ export default function Sidebar({ collapsed }) {
             <div className="conversation-info">
               <div className="conversation-title">{conv.title}</div>
               <div className="conversation-time">
-                {conv.updated_at ? new Date(conv.updated_at).toLocaleDateString() : ''}
+                {formatDate(conv.updated_at)}
               </div>
             </div>
           </div>

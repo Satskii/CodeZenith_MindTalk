@@ -20,7 +20,7 @@ const MicIcon = ({ active }) => (
 
 const WAVE_BARS = 12
 
-export default function ChatInput({ onSend, isTyping }) {
+export default function ChatInput({ onSend, isTyping, readOnly }) {
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
   const { language } = useChat()
@@ -61,6 +61,11 @@ export default function ChatInput({ onSend, isTyping }) {
 
   return (
     <div className="input-area">
+      {readOnly && (
+        <div className="read-only-banner">
+          📖 Read-Only Mode: You are viewing a past conversation. No new messages can be sent.
+        </div>
+      )}
       <div className="input-wrapper">
         {isBusy ? (
           <div className="voice-wave-container">
@@ -83,11 +88,12 @@ export default function ChatInput({ onSend, isTyping }) {
           <textarea
             ref={textareaRef}
             className="chat-input"
-            placeholder="Type your message..."
+            placeholder={readOnly ? "This conversation is in read-only mode" : "Type your message..."}
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
+            disabled={readOnly}
             aria-label="Type your message"
           />
         )}
@@ -96,7 +102,7 @@ export default function ChatInput({ onSend, isTyping }) {
           <button
             className={`input-action-btn${recording ? ' recording' : ''}`}
             onClick={toggleRecording}
-            disabled={transcribing || isTyping}
+            disabled={transcribing || isTyping || readOnly}
             aria-label={recording ? 'Stop recording' : 'Start voice input'}
             style={{ color: recording ? '#ef4444' : undefined }}
           >
@@ -106,7 +112,7 @@ export default function ChatInput({ onSend, isTyping }) {
           <button
             className="send-btn"
             onClick={handleSend}
-            disabled={!text.trim() || isTyping || isBusy}
+            disabled={!text.trim() || isTyping || isBusy || readOnly}
             aria-label="Send message"
           >
             <SendIcon />

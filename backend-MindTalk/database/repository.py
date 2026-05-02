@@ -140,14 +140,14 @@ def update_session_language(session_id: str, language: str):
 
 # ── Conversations ─────────────────────────────────────────────────────────────
 
-def create_conversation(user_id: str, session_id: str, title: str = "New Conversation") -> str:
+def create_conversation(user_id: str, session_id: str, title: str = "New Conversation", language: str = "english") -> str:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                """INSERT INTO conversations (user_id, session_id, title)
-                   VALUES (%s, %s, %s) RETURNING conv_id""",
-                (user_id, session_id, title)
+                """INSERT INTO conversations (user_id, session_id, language, title)
+                   VALUES (%s, %s, %s, %s) RETURNING conv_id""",
+                (user_id, session_id, language, title)
             )
             conv_id = str(cur.fetchone()[0])
         conn.commit()
@@ -161,7 +161,7 @@ def get_conversation(conv_id: str) -> dict | None:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT conv_id, user_id, title, msg_count, memory FROM conversations WHERE conv_id = %s",
+                "SELECT conv_id, user_id, language, title, msg_count, memory FROM conversations WHERE conv_id = %s",
                 (conv_id,)
             )
             row = cur.fetchone()
@@ -170,8 +170,8 @@ def get_conversation(conv_id: str) -> dict | None:
     if not row:
         return None
     return {
-        "conv_id": str(row[0]), "user_id": str(row[1]),
-        "title": row[2], "count": row[3], "memory": row[4],
+        "conv_id": str(row[0]), "user_id": str(row[1]), "language": row[2],
+        "title": row[3], "count": row[4], "memory": row[5],
     }
 
 
@@ -190,19 +190,29 @@ def get_user_conversations(user_id: str) -> list[dict]:
         release_connection(conn)
     return [
         {"conv_id": str(r[0]), "title": r[1], "msg_count": r[2],
-         "created_at": str(r[3]), "updated_at": str(r[4])}
+         "created_at": r[3].isoformat() if r[3] else None, "updated_at": r[4].isoformat() if r[4] else None}
         for r in rows
     ]
 
 
-def update_conversation(conv_id: str, memory: str, msg_count: int, title: str = None):
+def update_conversation(conv_id: str, memory: str, msg_count: int, title: str = None, language: str = None):
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            if title:
+            if title and language:
+                cur.execute(
+                    "UPDATE conversations SET memory=%s, msg_count=%s, title=%s, language=%s WHERE conv_id=%s",
+                    (memory, msg_count, title, language, conv_id)
+                )
+            elif title:
                 cur.execute(
                     "UPDATE conversations SET memory=%s, msg_count=%s, title=%s WHERE conv_id=%s",
                     (memory, msg_count, title, conv_id)
+                )
+            elif language:
+                cur.execute(
+                    "UPDATE conversations SET memory=%s, msg_count=%s, language=%s WHERE conv_id=%s",
+                    (memory, msg_count, language, conv_id)
                 )
             else:
                 cur.execute(

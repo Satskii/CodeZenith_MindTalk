@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useRef } from 'react'
+import { createContext, useContext, useState, useRef, useEffect } from 'react'
+import { useAuth } from './AuthContext'
 
 const ChatContext = createContext()
 
@@ -25,6 +26,8 @@ async function speakText(text, language) {
 }
 
 export function ChatProvider({ children }) {
+  const { language: authLanguage } = useAuth()
+  
   const [conversations, setConversations] = useState([])
   const [activeChatId, setActiveChatId] = useState(null)
   const [messages, setMessages] = useState([{
@@ -36,9 +39,17 @@ export function ChatProvider({ children }) {
   const [isLoading, setIsLoading] = useState(false)
   const [messagesUsed, setMessagesUsed] = useState(0)
   const [limitReached, setLimitReached] = useState(false)
-  const [language, setLanguage] = useState('english')
+  const [language, setLanguageState] = useState('english')
   const [muted, setMuted] = useState(false)
+  const [readOnly, setReadOnly] = useState(false)
   const convIdRef = useRef(null)
+
+  // Initialize language from auth context when it changes
+  useEffect(() => {
+    if (authLanguage) {
+      setLanguageState(authLanguage)
+    }
+  }, [authLanguage])
 
   const addMessage = (msg) => {
     setMessages(prev => [...prev, { ...msg, id: Date.now(), timestamp: new Date() }])
@@ -77,6 +88,7 @@ export function ChatProvider({ children }) {
     }])
     setMessagesUsed(0)
     setLimitReached(false)
+    setReadOnly(false)
   }
 
   const sendMessage = async (userMessage) => {
@@ -128,6 +140,31 @@ export function ChatProvider({ children }) {
   const selectConversation = (id) => {
     setActiveChatId(id)
     convIdRef.current = id
+    setReadOnly(true)
+    
+    // Fetch messages for the selected conversation
+    fetch(`${API_BASE_URL}/conversations/${id}/messages`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.messages) {
+          // Format messages for display
+          const formattedMessages = data.messages.map((msg, idx) => ({
+            id: idx,
+            role: msg.role,
+            text: msg.content,
+            timestamp: new Date()
+          }))
+          setMessages(formattedMessages)
+        }
+      })
+      .catch(err => console.error('Error loading conversation messages:', err))
+  }
+
+  // Wrapper for setLanguage to handle language change
+  const setLanguage = (newLang) => {
+    setLanguageState(newLang)
+    // Start a new chat when language changes
+    startNewChat()
   }
 
   return (
@@ -143,6 +180,7 @@ export function ChatProvider({ children }) {
       setLanguage,
       muted,
       setMuted,
+      readOnly,
       loadConversations,
       startNewChat,
       addMessage,

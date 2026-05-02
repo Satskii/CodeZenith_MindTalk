@@ -463,6 +463,23 @@
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-secondary);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.read-only-banner {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(79, 70, 229, 0.1) 100%);
+  border-left: 4px solid var(--accent-blue);
+  border-radius: var(--radius-lg);
+  color: var(--accent-blue-bright);
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
 }
 
 .input-wrapper {
@@ -499,6 +516,12 @@
   color: var(--text-muted);
 }
 
+.chat-input:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .input-actions {
   display: flex;
   align-items: center;
@@ -522,6 +545,11 @@
 .input-action-btn:hover {
   color: var(--text-secondary);
   background: var(--bg-card);
+}
+
+.input-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Voice button */

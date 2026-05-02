@@ -5,6 +5,7 @@ import ChatPage from './pages/ChatPage'
 import AuthPage from './pages/AuthPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import DocumentationPage from './pages/DocumentationPage'
 import { ThemeProvider } from './context/ThemeContext'
 import { ChatProvider } from './context/ChatContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -24,6 +25,7 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<LandingPage />} />
+              <Route path="/documentation" element={<DocumentationPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />

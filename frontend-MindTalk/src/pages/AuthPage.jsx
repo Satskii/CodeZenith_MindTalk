@@ -73,8 +73,8 @@ function AuthPage() {
         <div className="auth-logo" onClick={() => navigate('/')}>MindVarta</div>
 
         <div className="auth-tabs">
-          <button className={`auth-tab ${mode === 'signin' ? 'active' : ''}`} onClick={() => switchMode('signin')}>Sign In</button>
-          <button className={`auth-tab ${mode === 'signup' ? 'active' : ''}`} onClick={() => switchMode('signup')}>Sign Up</button>
+          <button type="button" className={`auth-tab ${mode === 'signin' ? 'active' : ''}`} onClick={() => switchMode('signin')}>Sign In</button>
+          <button type="button" className={`auth-tab ${mode === 'signup' ? 'active' : ''}`} onClick={() => switchMode('signup')}>Sign Up</button>
           <div className={`auth-tab-indicator ${mode === 'signup' ? 'right' : 'left'}`} />
         </div>
 
@@ -151,7 +151,7 @@ function AuthPage() {
 
           {mode === 'signin' && (
             <div className="auth-forgot">
-              <button className="auth-switch-link" onClick={() => navigate('/forgot-password')}>
+              <button type="button" className="auth-switch-link" onClick={() => navigate('/forgot-password')}>
                 Forgot password?
               </button>
             </div>
@@ -174,7 +174,7 @@ function AuthPage() {
 
         <p className="auth-switch-text">
           {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-          <button className="auth-switch-link" onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}>
+          <button type="button" className="auth-switch-link" onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}>
             {mode === 'signin' ? 'Sign Up' : 'Sign In'}
           </button>
         </p>

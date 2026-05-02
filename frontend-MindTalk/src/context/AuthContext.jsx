@@ -6,13 +6,20 @@ const API_BASE_URL = 'http://localhost:8000'
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)       // null = not loaded yet
   const [authReady, setAuthReady] = useState(false)
+  const [language, setLanguage] = useState('english')  // Session language preference
 
   // On mount — check if cookie session is still valid
   useEffect(() => {
     fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.user) setUser(data.user)
+        if (data?.user) {
+          setUser(data.user)
+          // Load session language preference
+          if (data.user.language) {
+            setLanguage(data.user.language)
+          }
+        }
       })
       .catch(() => {})
       .finally(() => setAuthReady(true))
@@ -28,6 +35,7 @@ export function AuthProvider({ children }) {
     const data = await res.json()
     if (!res.ok) throw new Error(data.detail || 'Signup failed')
     setUser(data.user)
+    setLanguage('english')  // Reset to default language on signup
     return data.user
   }
 
@@ -41,6 +49,7 @@ export function AuthProvider({ children }) {
     const data = await res.json()
     if (!res.ok) throw new Error(data.detail || 'Sign in failed')
     setUser(data.user)
+    setLanguage('english')  // Reset to default language on signin
     return data.user
   }
 
@@ -50,10 +59,11 @@ export function AuthProvider({ children }) {
       credentials: 'include',
     })
     setUser(null)
+    setLanguage('english')  // Reset to default language on signout
   }
 
   return (
-    <AuthContext.Provider value={{ user, authReady, signup, signin, signout }}>
+    <AuthContext.Provider value={{ user, authReady, language, signup, signin, signout }}>
       {children}
     </AuthContext.Provider>
   )

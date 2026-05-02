@@ -71,6 +71,7 @@ RULES:
 def extract_detailed_context(conversation_history: list, language: str = "english") -> dict:
     """
     Analyzes a conversation and extracts detailed, structured context.
+    Falls back to basic context generation if extraction fails or returns empty.
     
     Args:
         conversation_history: List of message dicts with 'role' and 'content'
@@ -117,14 +118,88 @@ def extract_detailed_context(conversation_history: list, language: str = "englis
         
         # Parse JSON
         extracted = json.loads(response_text)
-        return extracted
+        
+        # Ensure we have at least some fields (not all empty)
+        if extracted and any(v for v in extracted.values() if v):
+            print(f"[DEBUG] Successfully extracted detailed context from {len(conversation_history)} messages")
+            return extracted
+        else:
+            print(f"[DEBUG] Extracted context was empty, generating fallback")
+            return _generate_fallback_context(conversation_history)
         
     except json.JSONDecodeError as e:
-        print(f"[ERROR] Failed to parse extracted context: {e}")
-        return {}
+        print(f"[WARN] Failed to parse extracted context: {e}, using fallback")
+        return _generate_fallback_context(conversation_history)
     except Exception as e:
-        print(f"[ERROR] Context extraction failed: {e}")
+        print(f"[WARN] Context extraction failed: {e}, using fallback")
+        return _generate_fallback_context(conversation_history)
+
+
+def _generate_fallback_context(conversation_history: list) -> dict:
+    """
+    Generate basic context from conversation when LLM extraction fails.
+    Ensures we always have SOME context to work with.
+    """
+    if not conversation_history or len(conversation_history) < 2:
         return {}
+    
+    # Find user messages (skip system messages)
+    user_messages = [msg['content'] for msg in conversation_history if msg.get('role') == 'user']
+    assistant_messages = [msg['content'] for msg in conversation_history if msg.get('role') == 'assistant']
+    
+    if not user_messages:
+        return {}
+    
+    # Build basic context from what we can extract
+    context = {
+        "personal_info": {},
+        "current_situation": {
+            "challenges": [],
+            "achievements": [],
+            "responsibilities": ""
+        },
+        "emotional_context": {
+            "primary_feelings": [],
+            "past_struggles": [],
+            "coping_mechanisms": []
+        },
+        "specific_concerns": [],
+        "goals_and_interests": {
+            "short_term_goals": [],
+            "long_term_goals": [],
+            "interests": []
+        },
+        "health_indicators": {},
+        "advice_given_and_response": {}
+    }
+    
+    # Extract keywords from first user message that might indicate concerns
+    first_message = user_messages[0].lower()
+    
+    # Simple keyword detection for emotions
+    emotion_keywords = {
+        'stressed': 'stressed',
+        'anxious': 'anxious',
+        'overwhelmed': 'overwhelmed',
+        'sad': 'sad',
+        'worried': 'worried',
+        'tired': 'tired',
+        'confused': 'confused',
+        'frustrated': 'frustrated',
+    }
+    
+    for keyword, label in emotion_keywords.items():
+        if keyword in first_message:
+            context["emotional_context"]["primary_feelings"].append(label)
+    
+    # If we extracted at least one emotion, keep the context
+    if context["emotional_context"]["primary_feelings"]:
+        print(f"[DEBUG] Generated fallback context with detected emotions")
+        return context
+    
+    # If still empty, return minimal context
+    return {}
+
 
 
 def merge_contexts(old_context: dict | str, new_context: dict) -> dict:
@@ -212,6 +287,7 @@ def merge_contexts(old_context: dict | str, new_context: dict) -> dict:
 def format_context_for_llm(context: dict | str) -> str:
     """
     Formats extracted context into a readable prompt for the LLM.
+    Ensures SOMETHING is returned even if context is sparse.
     
     Args:
         context: Structured context dict or JSON string
@@ -233,53 +309,65 @@ def format_context_for_llm(context: dict | str) -> str:
     
     lines = []
     
-    # Personal info
+    # Personal info - only add section if we have content
     if ctx.get("personal_info"):
         pi = ctx["personal_info"]
-        lines.append("ABOUT THIS USER:")
-        if pi.get("background"):
-            lines.append(f"  - Background: {pi['background']}")
-        if pi.get("relationships"):
-            lines.append(f"  - Relationships: {pi['relationships']}")
-        if pi.get("location"):
-            lines.append(f"  - Location: {pi['location']}")
+        if any(v for v in pi.values() if v):  # Only add section if has content
+            lines.append("ABOUT THIS USER:")
+            if pi.get("background"):
+                lines.append(f"  - Background: {pi['background']}")
+            if pi.get("relationships"):
+                lines.append(f"  - Relationships: {pi['relationships']}")
+            if pi.get("location"):
+                lines.append(f"  - Location: {pi['location']}")
     
-    # Current situation
+    # Current situation - only add section if we have content
     if ctx.get("current_situation"):
         cs = ctx["current_situation"]
-        lines.append("\nCURRENT SITUATION:")
-        if cs.get("challenges"):
-            lines.append(f"  Challenges: {', '.join(cs['challenges'])}")
-        if cs.get("achievements"):
-            lines.append(f"  Recent wins: {', '.join(cs['achievements'])}")
-        if cs.get("responsibilities"):
-            lines.append(f"  Responsibilities: {cs['responsibilities']}")
+        has_content = any([cs.get("challenges"), cs.get("achievements"), cs.get("responsibilities")])
+        if has_content:
+            lines.append("\nCURRENT SITUATION:")
+            if cs.get("challenges"):
+                lines.append(f"  Challenges: {', '.join(cs['challenges'])}")
+            if cs.get("achievements"):
+                lines.append(f"  Recent wins: {', '.join(cs['achievements'])}")
+            if cs.get("responsibilities"):
+                lines.append(f"  Responsibilities: {cs['responsibilities']}")
     
-    # Emotions
+    # Emotions - only add section if we have content
     if ctx.get("emotional_context"):
         em = ctx["emotional_context"]
-        lines.append("\nEMOTIONAL CONTEXT:")
-        if em.get("primary_feelings"):
-            lines.append(f"  Currently feeling: {', '.join(em['primary_feelings'])}")
-        if em.get("coping_mechanisms"):
-            lines.append(f"  Usually copes with: {', '.join(em['coping_mechanisms'])}")
+        has_content = any([em.get("primary_feelings"), em.get("coping_mechanisms")])
+        if has_content:
+            lines.append("\nEMOTIONAL CONTEXT:")
+            if em.get("primary_feelings"):
+                lines.append(f"  Currently feeling: {', '.join(em['primary_feelings'])}")
+            if em.get("coping_mechanisms"):
+                lines.append(f"  Usually copes with: {', '.join(em['coping_mechanisms'])}")
     
-    # Concerns
+    # Concerns - only add section if we have content
     if ctx.get("specific_concerns"):
-        lines.append("\nSPECIFIC CONCERNS:")
-        for concern in ctx["specific_concerns"][:5]:  # Max 5
-            lines.append(f"  - {concern}")
+        concerns = ctx["specific_concerns"]
+        if concerns:
+            lines.append("\nSPECIFIC CONCERNS:")
+            for concern in concerns[:5]:  # Max 5
+                if concern:
+                    lines.append(f"  - {concern}")
     
-    # Goals
+    # Goals - only add section if we have content
     if ctx.get("goals_and_interests"):
         gi = ctx["goals_and_interests"]
-        lines.append("\nGOALS & INTERESTS:")
-        if gi.get("short_term_goals"):
-            lines.append(f"  Short-term: {', '.join(gi['short_term_goals'])}")
-        if gi.get("long_term_goals"):
-            lines.append(f"  Long-term: {', '.join(gi['long_term_goals'])}")
+        has_content = any([gi.get("short_term_goals"), gi.get("long_term_goals"), gi.get("interests")])
+        if has_content:
+            lines.append("\nGOALS & INTERESTS:")
+            if gi.get("short_term_goals"):
+                lines.append(f"  Short-term: {', '.join(gi['short_term_goals'])}")
+            if gi.get("long_term_goals"):
+                lines.append(f"  Long-term: {', '.join(gi['long_term_goals'])}")
+            if gi.get("interests"):
+                lines.append(f"  Interests: {', '.join(gi['interests'])}")
     
-    # Health
+    # Health - only add section if we have content
     if ctx.get("health_indicators"):
         hi = ctx["health_indicators"]
         if any(hi.values()):
@@ -288,4 +376,10 @@ def format_context_for_llm(context: dict | str) -> str:
                 if value:
                     lines.append(f"  - {key}: {value}")
     
-    return "\n".join(lines) if lines else ""
+    result = "\n".join(lines) if lines else ""
+    if result:
+        print(f"[DEBUG] Formatted detailed context ({len(result)} chars) for LLM")
+    else:
+        print(f"[DEBUG] No content to format from detailed context")
+    return result
+

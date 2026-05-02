@@ -261,6 +261,14 @@ async def delete_conversation(conv_id: str, current_user: dict = Depends(get_cur
     return {"message": "Deleted"}
 
 
+@app.get("/conversations/{conv_id}/messages")
+async def get_conversation_messages(conv_id: str, current_user: dict = Depends(get_current_user)):
+    # Verify ownership of conversation
+    verify_conversation_ownership(conv_id, current_user["id"])
+    messages = db.get_recent_history(conv_id)
+    return {"messages": messages}
+
+
 # ── Chat ──────────────────────────────────────────────────────────────────────
 
 @app.post("/chat")
@@ -279,11 +287,19 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
         # SECURITY: Verify ownership of existing conversation
         # This will raise 403 if user doesn't own the conversation
         conv = verify_conversation_ownership(conv_id, current_user["id"])
+        
+        # If language has changed from the conversation's language, start a new conversation
+        if conv.get("language") != language:
+            from datetime import datetime
+            title = f"Session on {datetime.now().strftime('%b %d')}"
+            conv_id = db.create_conversation(current_user["id"], current_user["session_id"], title, language)
+            conv = db.get_conversation(conv_id)
+            print(f"[INFO] Language changed from {conv.get('language')} to {language}. User {current_user['id']} created new conversation {conv_id}")
     else:
         # Create new conversation
         from datetime import datetime
         title = f"Session on {datetime.now().strftime('%b %d')}"
-        conv_id = db.create_conversation(current_user["id"], current_user["session_id"], title)
+        conv_id = db.create_conversation(current_user["id"], current_user["session_id"], title, language)
         conv = db.get_conversation(conv_id)
         print(f"[INFO] User {current_user['id']} created new conversation {conv_id}")
 
@@ -353,8 +369,19 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
     db.save_message(conv_id, "user", user_input)
     db.save_message(conv_id, "assistant", bot_reply)
     db.update_conversation(conv_id, new_summary, new_count)
+    
+    # ALWAYS save summary for cross-session context, with fallback generation if needed
     if new_summary:
         db.save_summary(conv_id, new_summary)
+        print(f"[INFO] Saved summary ({len(new_summary)} chars) for conv {conv_id}")
+    else:
+        # Fallback: generate summary from bot response if extracting didn't work
+        fallback_summary = bot_reply[:200] if bot_reply else f"User message: {user_input[:100]}"
+        if fallback_summary:
+            db.save_summary(conv_id, fallback_summary)
+            print(f"[INFO] Saved FALLBACK summary ({len(fallback_summary)} chars) for conv {conv_id}")
+        else:
+            print(f"[WARN] Could not save summary for conv {conv_id} - empty response and input")
     
     # Extract and save detailed context from this conversation
     # Do this for ALL messages, not just after 2+ messages, so context is available from the start

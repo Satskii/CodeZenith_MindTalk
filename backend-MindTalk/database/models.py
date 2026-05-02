@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     conv_id      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     session_id   UUID        REFERENCES sessions(session_id) ON DELETE SET NULL,
+    language     VARCHAR(20) NOT NULL DEFAULT 'english',
     title        VARCHAR(255) NOT NULL DEFAULT 'New Conversation',
     msg_count    INTEGER     NOT NULL DEFAULT 0,
     memory       TEXT        NOT NULL DEFAULT '',
@@ -125,3 +126,19 @@ BEGIN
 END;
 $$;
 """
+
+# ── Migration: Add language column to conversations if it doesn't exist ────────
+ADD_LANGUAGE_COLUMN_TO_CONVERSATIONS = """
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'conversations' AND column_name = 'language'
+    ) THEN
+        ALTER TABLE conversations ADD COLUMN language VARCHAR(20) NOT NULL DEFAULT 'english';
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+"""
+
+

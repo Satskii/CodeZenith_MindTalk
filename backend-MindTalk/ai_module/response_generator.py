@@ -11,6 +11,7 @@ def extract_response_and_summary(raw_text: str) -> tuple:
     """
     Extract actual_response and summarize_context from raw text.
     Handles both JSON and mixed formats where the model might include field names.
+    CRITICAL: Always extract a summary, even if we need to generate one from the response.
     """
     # Try JSON parsing first
     try:
@@ -18,6 +19,9 @@ def extract_response_and_summary(raw_text: str) -> tuple:
         actual = parsed.get("actual_response", "").strip()
         summary = parsed.get("summarize_context", "").strip()
         if actual:
+            # If we got actual_response but no summary, generate one
+            if not summary:
+                summary = _generate_fallback_summary(actual)
             return actual, summary
     except json.JSONDecodeError:
         pass
@@ -31,12 +35,34 @@ def extract_response_and_summary(raw_text: str) -> tuple:
     summary_match = re.search(r'summarize_context\s*:\s*["\']?(.+?)(?:["\']?\s*$)', raw_text, re.IGNORECASE | re.DOTALL)
     summary = summary_match.group(1).strip() if summary_match else ""
     
-    # If we found field names, return extracted values
+    # If we found field names, return extracted values with fallback summary generation
     if actual_response or summary:
+        if actual_response and not summary:
+            summary = _generate_fallback_summary(actual_response)
         return actual_response, summary
     
-    # If no field names found, use the entire raw text as response
-    return raw_text.strip(), ""
+    # If no field names found, use the entire raw text as response + generate summary
+    response = raw_text.strip()
+    summary = _generate_fallback_summary(response) if response else ""
+    return response, summary
+
+
+def _generate_fallback_summary(response_text: str) -> str:
+    """
+    Generate a fallback summary from the response text if LLM didn't provide one.
+    Takes first 1-2 sentences or key points from the response.
+    """
+    if not response_text:
+        return ""
+    
+    # Take first 1-2 sentences as summary
+    sentences = response_text.split(". ")
+    if len(sentences) > 2:
+        summary = ". ".join(sentences[:2]) + "."
+    else:
+        summary = response_text[:200] if len(response_text) > 200 else response_text
+    
+    return summary.strip()
 
 
 def generate_response(
