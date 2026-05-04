@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useChat } from '../../context/ChatContext'
+import MindVartaLogo from '../../assets/MindVarta_Logo.png'
 
 const LANGUAGES = [
   { code: 'english', label: 'English', flag: '🇬🇧' },
@@ -71,9 +72,9 @@ export default function ChatHeader({ onToggleSidebar, muted, onToggleMute }) {
           {muted ? '🔇' : '🔊'}
         </button>
 
-        {/* Avatar */}
-        <div className="avatar-btn" title="Profile">
-          MT
+        {/* Logo */}
+        <div className="logo-btn" title="MindVarta">
+          <img src={MindVartaLogo} alt="MindVarta Logo" className="logo-image" />
         </div>
       </div>
     </header>

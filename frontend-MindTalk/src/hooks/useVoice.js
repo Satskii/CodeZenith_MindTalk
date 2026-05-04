@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 
-const API_BASE_URL = 'http://localhost:8000'
+const API_BASE_URL = 'http://localhost:5000'
 
 /**
  * useVoice — records audio via MediaRecorder, sends to Whisper STT endpoint,

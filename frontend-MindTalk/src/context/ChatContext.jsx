@@ -2,8 +2,13 @@ import { createContext, useContext, useState, useRef, useEffect } from 'react'
 import { useAuth } from './AuthContext'
 
 const ChatContext = createContext()
+const API_BASE_URL = 'http://localhost:5000'
 
-const API_BASE_URL = 'http://localhost:8000'
+const WELCOME_MESSAGES = {
+  english: "Hello! I'm here to provide support for your mental health concerns. How are you feeling today?",
+  hindi:   "नमस्ते! मैं आपकी मानसिक स्वास्थ्य संबंधी चिंताओं में सहायता के लिए यहाँ हूँ। आज आप कैसा महसूस कर रहे हैं?",
+  bengali: "হ্যালো! আমি আপনার মানসিক স্বাস্থ্য সংক্রান্ত উদ্বেগে সহায়তা করতে এখানে আছি। আজ আপনি কেমন অনুভব করছেন?",
+}
 const FREE_LIMIT = 10
 
 async function speakText(text, language) {
@@ -33,7 +38,7 @@ export function ChatProvider({ children }) {
   const [messages, setMessages] = useState([{
     id: 1,
     role: 'assistant',
-    text: "Hello! I'm here to provide support for your mental health concerns. How are you feeling today?",
+    text: WELCOME_MESSAGES['english'],
     timestamp: new Date(),
   }])
   const [isLoading, setIsLoading] = useState(false)
@@ -44,12 +49,29 @@ export function ChatProvider({ children }) {
   const [readOnly, setReadOnly] = useState(false)
   const convIdRef = useRef(null)
 
-  // Initialize language from auth context when it changes
+  // Update welcome message when language changes
   useEffect(() => {
     if (authLanguage) {
       setLanguageState(authLanguage)
+      // Update the welcome message if it's the only message shown
+      setMessages(prev => {
+        if (prev.length === 1 && prev[0].role === 'assistant') {
+          return [{ ...prev[0], text: WELCOME_MESSAGES[authLanguage] || WELCOME_MESSAGES.english }]
+        }
+        return prev
+      })
     }
   }, [authLanguage])
+
+  const clearChat = () => {
+    setConversations([])
+    setActiveChatId(null)
+    setMessages([{ id: Date.now(), role: 'assistant', text: WELCOME_MESSAGES[language] || WELCOME_MESSAGES.english, timestamp: new Date() }])
+    setMessagesUsed(0)
+    setLimitReached(false)
+    setReadOnly(false)
+    convIdRef.current = null
+  }
 
   const addMessage = (msg) => {
     setMessages(prev => [...prev, { ...msg, id: Date.now(), timestamp: new Date() }])
@@ -64,7 +86,7 @@ export function ChatProvider({ children }) {
     } catch (_) {}
   }
 
-  const startNewChat = async () => {
+  const startNewChat = async (chatLanguage = language) => {
     try {
       const res = await fetch(`${API_BASE_URL}/conversations`, {
         method: 'POST',
@@ -83,7 +105,7 @@ export function ChatProvider({ children }) {
     setMessages([{
       id: Date.now(),
       role: 'assistant',
-      text: "Hello! I'm here to provide support for your mental health concerns. How are you feeling today?",
+      text: WELCOME_MESSAGES[chatLanguage] || WELCOME_MESSAGES.english,
       timestamp: new Date(),
     }])
     setMessagesUsed(0)
@@ -160,11 +182,16 @@ export function ChatProvider({ children }) {
       .catch(err => console.error('Error loading conversation messages:', err))
   }
 
-  // Wrapper for setLanguage to handle language change
   const setLanguage = (newLang) => {
     setLanguageState(newLang)
-    // Start a new chat when language changes
-    startNewChat()
+    // Update welcome message immediately if only the greeting is shown
+    setMessages(prev => {
+      if (prev.length === 1 && prev[0].role === 'assistant') {
+        return [{ ...prev[0], text: WELCOME_MESSAGES[newLang] || WELCOME_MESSAGES.english }]
+      }
+      return prev
+    })
+    startNewChat(newLang)
   }
 
   return (
@@ -183,6 +210,7 @@ export function ChatProvider({ children }) {
       readOnly,
       loadConversations,
       startNewChat,
+      clearChat,
       addMessage,
       sendMessage,
       selectConversation,

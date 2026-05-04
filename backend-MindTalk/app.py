@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from typing import Optional
 
 from ai_module.response_generator import generate_response
-from ai_module.context_extractor import extract_detailed_context, format_context_for_llm
 from ai_module.config import FREE_CHAT_LIMIT
 from stt_module.transcriber import transcribe_audio
 from tts_module.synthesizer import synthesize_speech
@@ -315,39 +314,15 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
 
     history = db.get_recent_history(conv_id)
 
-    # Get detailed context from previous conversations
-    # This captures specific information the user shared in past sessions
-    detailed_context = db.get_user_detailed_context(
-        current_user["id"], 
-        exclude_conv_id=conv_id
-    )
-    
-    # Format detailed context for the LLM
-    formatted_detailed_context = format_context_for_llm(detailed_context)
-    
-    # Always combine all available context sources for the LLM
+    # Build memory: current conversation memory + summaries from previous sessions
     memory = conv["memory"]
-    
-    # Get context summary as additional context source
-    context_summary = db.get_user_context_summary(current_user["id"], exclude_conv_id=conv_id)
-    
-    # Build comprehensive memory: detailed context + summary context + current conversation memory
-    memory_parts = []
-    if formatted_detailed_context:
-        memory_parts.append(formatted_detailed_context)
-    if context_summary:
-        memory_parts.append(context_summary)
-    if memory:
-        memory_parts.append(memory)
-    
-    # Combine all parts with clear separation
-    memory = "\n\n".join(memory_parts) if memory_parts else ""
-    
-    # Log for debugging context retrieval for all users
     if not memory:
-        print(f"[INFO] No prior context found for user {current_user['id']} in conv {conv_id}")
-    else:
-        print(f"[INFO] Loaded context for user {current_user['id']}: {len(memory)} chars")
+        prior_context = db.get_user_context_summary(current_user["id"], exclude_conv_id=conv_id)
+        if prior_context:
+            memory = prior_context
+            print(f"[INFO] Loaded prior context ({len(memory)} chars) for user {current_user['id']}")
+        else:
+            print(f"[INFO] No prior context for user {current_user['id']} (first conversation)")
 
     try:
         result = generate_response(
@@ -363,44 +338,17 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
         raise HTTPException(status_code=500, detail="Failed to get a response. Please try again.")
 
     bot_reply = result["actual_response"]
-    new_summary = result.get("summarize_context", "") or conv["memory"]
+    new_summary = result.get("summarize_context", "").strip() or conv["memory"]
     new_count = conv["count"] + 1
 
     db.save_message(conv_id, "user", user_input)
     db.save_message(conv_id, "assistant", bot_reply)
     db.update_conversation(conv_id, new_summary, new_count)
-    
-    # ALWAYS save summary for cross-session context, with fallback generation if needed
-    if new_summary:
-        db.save_summary(conv_id, new_summary)
-        print(f"[INFO] Saved summary ({len(new_summary)} chars) for conv {conv_id}")
-    else:
-        # Fallback: generate summary from bot response if extracting didn't work
-        fallback_summary = bot_reply[:200] if bot_reply else f"User message: {user_input[:100]}"
-        if fallback_summary:
-            db.save_summary(conv_id, fallback_summary)
-            print(f"[INFO] Saved FALLBACK summary ({len(fallback_summary)} chars) for conv {conv_id}")
-        else:
-            print(f"[WARN] Could not save summary for conv {conv_id} - empty response and input")
-    
-    # Extract and save detailed context from this conversation
-    # Do this for ALL messages, not just after 2+ messages, so context is available from the start
-    try:
-        full_history = history + [{"role": "user", "content": user_input}, {"role": "assistant", "content": bot_reply}]
-        if len(full_history) > 0:  # Extract from first message onwards
-            new_detailed_context = extract_detailed_context(full_history, language)
-            if new_detailed_context:
-                db.update_detailed_context(
-                    current_user["id"],
-                    new_detailed_context,
-                    conversation_id=conv_id
-                )
-                print(f"[INFO] Saved detailed context for user {current_user['id']} from conv {conv_id}")
-            else:
-                print(f"[DEBUG] No detailed context extracted (might be too short): {len(full_history)} messages")
-    except Exception as e:
-        print(f"[WARN] Detailed context extraction failed for user {current_user['id']}: {e}")
-        # Don't fail the chat request if context extraction fails
+
+    # Always save a summary for cross-session context
+    summary_to_save = new_summary or bot_reply[:200] or user_input[:100]
+    if summary_to_save:
+        db.save_summary(conv_id, summary_to_save)
 
     # Sync language on auth session
     if language != current_user.get("language"):
@@ -491,3 +439,10 @@ async def get_mood_logs(current_user: dict = Depends(get_current_user)):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# ── Server Startup ────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=5000)

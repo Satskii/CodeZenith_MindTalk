@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 
 const AuthContext = createContext()
-const API_BASE_URL = 'http://localhost:8000'
+const API_BASE_URL = 'http://localhost:5000'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)       // null = not loaded yet
@@ -53,13 +53,14 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
-  const signout = async () => {
+  const signout = async (onSignout) => {
     await fetch(`${API_BASE_URL}/auth/signout`, {
       method: 'POST',
       credentials: 'include',
     })
     setUser(null)
-    setLanguage('english')  // Reset to default language on signout
+    setLanguage('english')
+    if (onSignout) onSignout()  // clear chat state
   }
 
   return (

@@ -77,7 +77,7 @@ DB_PASSWORD=your_db_password
 
 **5. Run the server**
 ```bash
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 5000
+python app.py
 ```
 
 Server starts at `http://localhost:5000`

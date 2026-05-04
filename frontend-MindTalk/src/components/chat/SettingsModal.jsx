@@ -7,7 +7,7 @@ import '../../styles/settings.css'
 
 export default function SettingsModal({ open, onClose }) {
   const { theme, toggleTheme } = useTheme()
-  const { language, setLanguage, muted, setMuted } = useChat()
+  const { language, setLanguage, muted, setMuted, clearChat } = useChat()
   const { user, signout } = useAuth()
   const navigate = useNavigate()
 
@@ -18,13 +18,13 @@ export default function SettingsModal({ open, onClose }) {
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
 
-  if (!open) return null
-
   const handleSignout = async () => {
-    await signout()
+    await signout(clearChat)
     onClose()
     navigate('/auth')
   }
+
+  if (!open) return null
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
