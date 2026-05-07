@@ -227,6 +227,32 @@
   border-color: var(--accent-blue);
 }
 
+/* Back button */
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  white-space: nowrap;
+}
+
+.back-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-blue);
+  background: var(--bg-card-hover);
+}
+
+.back-btn svg {
+  flex-shrink: 0;
+}
+
 /* Language selector */
 .language-selector {
   display: flex;

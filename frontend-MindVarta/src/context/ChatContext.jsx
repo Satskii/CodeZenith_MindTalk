@@ -35,6 +35,7 @@ export function ChatProvider({ children }) {
   
   const [conversations, setConversations] = useState([])
   const [activeChatId, setActiveChatId] = useState(null)
+  const [currentChatId, setCurrentChatId] = useState(null) // Track the most recent/active chat
   const [messages, setMessages] = useState([{
     id: 1,
     role: 'assistant',
@@ -47,6 +48,7 @@ export function ChatProvider({ children }) {
   const [language, setLanguageState] = useState('english')
   const [muted, setMuted] = useState(false)
   const [readOnly, setReadOnly] = useState(false)
+  const [isViewingPreviousChat, setIsViewingPreviousChat] = useState(false) // Track if viewing previous chat
   const convIdRef = useRef(null)
 
   // Update welcome message when language changes
@@ -66,10 +68,12 @@ export function ChatProvider({ children }) {
   const clearChat = () => {
     setConversations([])
     setActiveChatId(null)
+    setCurrentChatId(null)
     setMessages([{ id: Date.now(), role: 'assistant', text: WELCOME_MESSAGES[language] || WELCOME_MESSAGES.english, timestamp: new Date() }])
     setMessagesUsed(0)
     setLimitReached(false)
     setReadOnly(false)
+    setIsViewingPreviousChat(false)
     convIdRef.current = null
   }
 
@@ -95,6 +99,8 @@ export function ChatProvider({ children }) {
       const data = await res.json()
       convIdRef.current = data.conv_id
       setActiveChatId(data.conv_id)
+      setCurrentChatId(data.conv_id) // Set as the current/active chat
+      setIsViewingPreviousChat(false) // Not viewing previous chat anymore
       setConversations(prev => [
         { conv_id: data.conv_id, title: data.title, msg_count: 0 },
         ...prev,
@@ -163,6 +169,7 @@ export function ChatProvider({ children }) {
     setActiveChatId(id)
     convIdRef.current = id
     setReadOnly(true)
+    setIsViewingPreviousChat(id !== currentChatId) // Set to true if viewing a different chat than current
     
     // Fetch messages for the selected conversation
     fetch(`${API_BASE_URL}/conversations/${id}/messages`, { credentials: 'include' })
@@ -180,6 +187,31 @@ export function ChatProvider({ children }) {
         }
       })
       .catch(err => console.error('Error loading conversation messages:', err))
+  }
+
+  const returnToCurrentChat = () => {
+    if (currentChatId) {
+      setActiveChatId(currentChatId)
+      convIdRef.current = currentChatId
+      setIsViewingPreviousChat(false)
+      setReadOnly(false)
+      
+      // Fetch messages for the current conversation
+      fetch(`${API_BASE_URL}/conversations/${currentChatId}/messages`, { credentials: 'include' })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.messages) {
+            const formattedMessages = data.messages.map((msg, idx) => ({
+              id: idx,
+              role: msg.role,
+              text: msg.content,
+              timestamp: new Date()
+            }))
+            setMessages(formattedMessages)
+          }
+        })
+        .catch(err => console.error('Error loading current conversation messages:', err))
+    }
   }
 
   const setLanguage = (newLang) => {
@@ -208,12 +240,14 @@ export function ChatProvider({ children }) {
       muted,
       setMuted,
       readOnly,
+      isViewingPreviousChat,
       loadConversations,
       startNewChat,
       clearChat,
       addMessage,
       sendMessage,
       selectConversation,
+      returnToCurrentChat,
     }}>
       {children}
     </ChatContext.Provider>
