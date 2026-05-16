@@ -8,7 +8,7 @@ import '../styles/chat.css'
 
 export default function ChatPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const { sendMessage, isLoading, muted, setMuted, loadConversations, readOnly } = useChat()
+  const { sendMessage, isLoading, muted, setMuted, voiceModeEnabled, loadConversations, readOnly } = useChat()
 
   useEffect(() => {
     loadConversations()
@@ -22,6 +22,7 @@ export default function ChatPage() {
         <ChatHeader
           onToggleSidebar={() => setSidebarCollapsed(c => !c)}
           muted={muted}
+          voiceModeEnabled={voiceModeEnabled}
           onToggleMute={() => setMuted(m => !m)}
         />
 

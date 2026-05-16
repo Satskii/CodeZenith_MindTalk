@@ -7,7 +7,7 @@ import '../../styles/settings.css'
 
 export default function SettingsModal({ open, onClose }) {
   const { theme, toggleTheme } = useTheme()
-  const { language, setLanguage, muted, setMuted, clearChat } = useChat()
+  const { language, setLanguage, voiceModeEnabled, setVoiceModeEnabled, muted, setMuted, clearChat } = useChat()
   const { user, signout } = useAuth()
   const navigate = useNavigate()
 
@@ -105,11 +105,21 @@ export default function SettingsModal({ open, onClose }) {
             <h3 className="settings-section-title">Voice & Audio</h3>
             <div className="settings-row">
               <div className="settings-row-info">
-                <span className="settings-row-label">Voice Responses</span>
-                <span className="settings-row-desc">Have MindVarta speak its replies aloud</span>
+                <span className="settings-row-label">Voice Mode</span>
+                <span className="settings-row-desc">Enable microphone input and spoken responses</span>
               </div>
               <label className="toggle-switch">
-                <input type="checkbox" checked={!muted} onChange={() => setMuted(m => !m)} />
+                <input type="checkbox" checked={voiceModeEnabled} onChange={() => setVoiceModeEnabled(v => !v)} />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row-info">
+                <span className="settings-row-label">Voice Responses</span>
+                <span className="settings-row-desc">Have MindVarta speak replies when Voice Mode is on</span>
+              </div>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={!muted} onChange={() => setMuted(m => !m)} disabled={!voiceModeEnabled} />
                 <span className="toggle-slider" />
               </label>
             </div>

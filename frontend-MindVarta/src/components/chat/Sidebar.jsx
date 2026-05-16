@@ -33,6 +33,16 @@ const HomeIcon = () => (
   </svg>
 )
 
+const DeleteIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+)
+
 const SettingsIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
@@ -43,8 +53,20 @@ const SettingsIcon = () => (
 export default function Sidebar({ collapsed }) {
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
-  const { conversations, activeChatId, startNewChat, selectConversation } = useChat()
+  const { conversations, activeChatId, startNewChat, selectConversation, deleteConversation } = useChat()
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const handleDeleteConversation = async (e, convId) => {
+    e.stopPropagation()
+    const confirmed = window.confirm('Delete this conversation permanently? This cannot be undone.')
+    if (!confirmed) return
+
+    try {
+      await deleteConversation(convId)
+    } catch (error) {
+      window.alert(error.message || 'Failed to delete conversation.')
+    }
+  }
 
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
@@ -88,6 +110,14 @@ export default function Sidebar({ collapsed }) {
                 {formatDate(conv.updated_at)}
               </div>
             </div>
+            <button
+              className="conversation-delete-btn"
+              onClick={(e) => handleDeleteConversation(e, conv.conv_id)}
+              aria-label={`Delete ${conv.title}`}
+              title="Delete conversation"
+            >
+              <DeleteIcon />
+            </button>
           </div>
         ))}
       </div>

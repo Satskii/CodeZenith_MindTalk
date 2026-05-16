@@ -8,7 +8,7 @@ const LANGUAGES = [
   { code: 'bengali', label: 'বাংলা',   flag: '🇧🇩' },
 ]
 
-export default function ChatHeader({ onToggleSidebar, muted, onToggleMute }) {
+export default function ChatHeader({ onToggleSidebar, muted, voiceModeEnabled, onToggleMute }) {
   const { language, setLanguage, isViewingPreviousChat, returnToCurrentChat } = useChat()
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -82,10 +82,11 @@ export default function ChatHeader({ onToggleSidebar, muted, onToggleMute }) {
         <button
           className="header-icon-btn"
           onClick={onToggleMute}
-          aria-label={muted ? 'Unmute' : 'Mute'}
-          title={muted ? 'Unmute responses' : 'Mute responses'}
+          aria-label={!voiceModeEnabled ? 'Voice mode is off' : muted ? 'Unmute' : 'Mute'}
+          title={!voiceModeEnabled ? 'Enable voice mode in settings' : muted ? 'Unmute responses' : 'Mute responses'}
+          disabled={!voiceModeEnabled}
         >
-          {muted ? '🔇' : '🔊'}
+          {!voiceModeEnabled ? '🎙️' : muted ? '🔇' : '🔊'}
         </button>
 
         {/* Logo */}

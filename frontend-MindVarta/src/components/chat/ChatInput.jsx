@@ -23,7 +23,7 @@ const WAVE_BARS = 12
 export default function ChatInput({ onSend, isTyping, readOnly }) {
   const [text, setText] = useState('')
   const textareaRef = useRef(null)
-  const { language } = useChat()
+  const { language, voiceModeEnabled } = useChat()
 
   const { recording, transcribing, toggleRecording } = useVoice({
     language,
@@ -102,8 +102,8 @@ export default function ChatInput({ onSend, isTyping, readOnly }) {
           <button
             className={`input-action-btn${recording ? ' recording' : ''}`}
             onClick={toggleRecording}
-            disabled={transcribing || isTyping || readOnly}
-            aria-label={recording ? 'Stop recording' : 'Start voice input'}
+            disabled={!voiceModeEnabled || transcribing || isTyping || readOnly}
+            aria-label={voiceModeEnabled ? (recording ? 'Stop recording' : 'Start voice input') : 'Enable voice mode in settings'}
             style={{ color: recording ? '#ef4444' : undefined }}
           >
             <MicIcon active={recording} />

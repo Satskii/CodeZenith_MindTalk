@@ -46,6 +46,7 @@ export function ChatProvider({ children }) {
   const [messagesUsed, setMessagesUsed] = useState(0)
   const [limitReached, setLimitReached] = useState(false)
   const [language, setLanguageState] = useState('english')
+  const [voiceModeEnabled, setVoiceModeEnabled] = useState(false)
   const [muted, setMuted] = useState(false)
   const [readOnly, setReadOnly] = useState(false)
   const [isViewingPreviousChat, setIsViewingPreviousChat] = useState(false) // Track if viewing previous chat
@@ -156,7 +157,7 @@ export function ChatProvider({ children }) {
       if (data.messages_remaining === 0) setLimitReached(true)
 
       addMessage({ role: 'assistant', text: data.response })
-      if (!muted) speakText(data.response, language)
+      if (voiceModeEnabled && !muted) speakText(data.response, language)
     } catch (error) {
       console.error('Error sending message:', error)
       addMessage({ role: 'assistant', text: 'Sorry, I encountered an error. Please try again.' })
@@ -214,6 +215,60 @@ export function ChatProvider({ children }) {
     }
   }
 
+  const deleteConversation = async (convId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/conversations/${convId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.detail || err?.error || 'Failed to delete conversation')
+      }
+
+      setConversations(prev => prev.filter(c => c.conv_id !== convId))
+
+      const deletedWasActive = activeChatId === convId
+      const deletedWasCurrent = currentChatId === convId
+
+      if (deletedWasCurrent) {
+        setCurrentChatId(null)
+        convIdRef.current = null
+        setReadOnly(false)
+        setIsViewingPreviousChat(false)
+        setMessages([{ id: Date.now(), role: 'assistant', text: WELCOME_MESSAGES[language] || WELCOME_MESSAGES.english, timestamp: new Date() }])
+        setMessagesUsed(0)
+        setLimitReached(false)
+        setActiveChatId(null)
+      } else if (deletedWasActive && currentChatId) {
+        setActiveChatId(currentChatId)
+        convIdRef.current = currentChatId
+        setReadOnly(false)
+        setIsViewingPreviousChat(false)
+
+        try {
+          const msgRes = await fetch(`${API_BASE_URL}/conversations/${currentChatId}/messages`, { credentials: 'include' })
+          const data = msgRes.ok ? await msgRes.json() : null
+          if (data?.messages) {
+            const formattedMessages = data.messages.map((msg, idx) => ({
+              id: idx,
+              role: msg.role,
+              text: msg.content,
+              timestamp: new Date(),
+            }))
+            setMessages(formattedMessages)
+          }
+        } catch (err) {
+          console.error('Error loading current conversation after deletion:', err)
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error)
+      throw error
+    }
+  }
+
+
   const setLanguage = (newLang) => {
     setLanguageState(newLang)
     // Update welcome message immediately if only the greeting is shown
@@ -237,6 +292,8 @@ export function ChatProvider({ children }) {
       limitReached,
       language,
       setLanguage,
+      voiceModeEnabled,
+      setVoiceModeEnabled,
       muted,
       setMuted,
       readOnly,
@@ -248,6 +305,7 @@ export function ChatProvider({ children }) {
       sendMessage,
       selectConversation,
       returnToCurrentChat,
+      deleteConversation,
     }}>
       {children}
     </ChatContext.Provider>

@@ -156,6 +156,28 @@
   margin-top: 2px;
 }
 
+.conversation-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.conversation-item:hover .conversation-delete-btn,
+.conversation-item.active .conversation-delete-btn {
+  opacity: 1;
+}
+
+.conversation-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
 /* Sidebar footer */
 .sidebar-footer {
   padding: 12px;
