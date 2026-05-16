@@ -22,6 +22,18 @@ COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 SUPPORTED_LANGUAGES = {"english", "hindi", "bengali", "en", "hi", "bn"}
 
 
+# ── Language detection ────────────────────────────────────────────────────────
+#
+# Replaced the old Unicode-only detect_language() function with an import from
+# ai_module/language_detector.py — which uses a Unicode fast path AND a lightweight
+# LLM call as fallback. This correctly handles romanized Bengali ("ami khub kharap
+# achi") and romanized Hindi ("mujhe bahut bura lag raha hai") which the old
+# Unicode-only version classified as "english".
+#
+from ai_module.language_detector import detect_language
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -276,9 +288,12 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
     if not user_input:
         raise HTTPException(status_code=400, detail="No message provided")
 
-    language = (body.language or "english").strip().lower()
-    if language not in SUPPORTED_LANGUAGES:
-        language = "english"
+    # ── AUTO-DETECT LANGUAGE FROM THE MESSAGE TEXT ──
+    # Previously language came from body.language (a static frontend value).
+    # Now we detect from the actual message text so romanized Bengali/Hindi
+    # ("ami khub kharap achi", "mujhe bura lag raha hai") are correctly identified.
+    language = detect_language(user_input)
+    print(f"[LANG] Detected language: '{language}' from message: {user_input[:60]!r}")
 
     # Get or create conversation
     conv_id = body.conv_id

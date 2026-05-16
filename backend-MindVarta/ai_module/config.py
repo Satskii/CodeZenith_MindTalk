@@ -7,7 +7,11 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 AI_MODEL = "llama-3.1-8b-instant"
 BASE_URL = "https://api.groq.com/openai/v1"
-TEMPERATURE = 0.7
+
+# Temperature: 0.9 gives warm, varied, human-feeling responses.
+# Lower values (≤0.6) make replies repetitive and formulaic — avoid for this use case.
+TEMPERATURE = 0.9
+
 MAX_TOKENS = 512
 
 # Free chat limit per session
